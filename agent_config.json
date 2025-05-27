@@ -1,0 +1,39 @@
+{
+  "DQL": {
+    "module": "agents.dql_agent",
+    "class": "DeepQLearningAgent",
+    "init_args": {
+
+      "num_actions": [
+
+      ]
+    },
+    "train_mode": "deeeeeeeep"
+  },
+  "RandomAgent": {
+    "module": "agents.random_agent",
+    "class": "RandomAgent",
+    "init_args": {
+    },
+    "train_mode": "iterative"
+  },
+  "OtherAgent1": {
+    "module": "agents.other_agent1",
+    "class": "OtherAgent1",
+    "init_args": {
+
+      "action_space": [
+
+      ]
+    },
+    "train_mode": "deeeeeepeeeerrrrr"
+  },
+  "OtherAgent2": {
+    "module": "agents.other_agent2",
+    "class": "OtherAgent2",
+    "init_args": {
+
+    },
+    "train_mode": "MUCHdeeeeeepeeeerrrrr"
+  }
+}
