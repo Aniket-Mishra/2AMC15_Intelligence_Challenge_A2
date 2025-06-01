@@ -14,7 +14,7 @@ from world.helpers import save_results, action_to_direction
 try:
     from agents import BaseAgent
     from world.grid import Grid
-    from world.gui import GUI
+    from world.cont_gui import GUI
     from world.path_visualizer import visualize_path
 except ModuleNotFoundError:
     from os import path
@@ -97,11 +97,15 @@ class Cont_Environment:
 
         # GUI specific code: Set up the environment as a blank state.
         self.no_gui = no_gui
-        #if target_fps <= 0:
-        #    self.target_spf = 0.
-        #else:
-        #    self.target_spf = 1. / target_fps
-        #self.gui = None
+        if not self.no_gui:
+            world_width = self.x_bounds[1] - self.x_bounds[0]
+            world_height = self.y_bounds[1] - self.y_bounds[0]
+            self.gui = GUI(world_size=(world_width, world_height),
+                           window_size=(1400, 800),
+                           fps=30)
+            self.gui.reset()
+        else:
+            self.gui = None
 
     def _reset_info(self) -> dict:
         """Resets the info dictionary.
@@ -185,13 +189,8 @@ class Cont_Environment:
         self.info = self._reset_info()
         self.world_stats = self._reset_world_stats()
 
-        # GUI specific code # TODO: modify and re-enable when GUI is done
-        #if not self.no_gui:
-        #    self.gui = GUI(self.grid.shape)
-        #    self.gui.reset()
-        #else:
-        #    if self.gui is not None:
-        #        self.gui.close()
+        if self.gui is not None:
+            self.gui.reset()
 
         return self.agent_pos
 
@@ -235,24 +234,27 @@ class Cont_Environment:
             1) The reward for the agent,
             2) If the terminal state has been reached (currently unused since there is no target)
         """
-        
+
+        # GUI specific code
+        if self.gui is not None:
+            #If we are paused AND the user has NOT pressed the right-arrow or next step button, just redraw
+            if self.gui.paused and not self.gui.step_requested:
+                paused_info = self._reset_info()
+                paused_info["agent_moved"] = False
+                self.gui.render(None, self.agent_pos, paused_info, self.world_stats, 0.0, False)
+                return self.agent_pos, 0.0, self.terminal_state, self.info
+
+            #If single-step was requested, clear that flag and proceed exactly one step
+            if self.gui.step_requested:
+                is_single_step = True
+                self.gui.step_requested = False
+            else:
+                is_single_step = False
+        else:
+            # GUI is disabled so no pause/single-step logic
+            is_single_step = False
+
         self.world_stats["total_steps"] += 1
-        
-        # GUI specific code # TODO: modify and re-enable when GUI is done
-        #is_single_step = False
-        #if not self.no_gui:
-        #    start_time = time()
-        #    while self.gui.paused:
-        #        # If the GUI is paused but asking to step, then we step
-        #        if self.gui.step:
-        #            is_single_step = True
-        #            self.gui.step = False
-        #            break
-        #        # Otherwise, we render the current state only
-        #        paused_info = self._reset_info()
-        #        paused_info["agent_moved"] = True
-        #        self.gui.render(self.grid, self.agent_pos, paused_info,
-        #                        0, is_single_step)    
 
         # Add stochasticity into the agent action
         # TODO: Implement later? (not sure if we even want this at all)
@@ -286,13 +288,9 @@ class Cont_Environment:
         
         self.world_stats["cumulative_reward"] += reward
 
-        # GUI specific code # TODO: modify and re-enable when GUI is done
-        #if not self.no_gui:
-        #    time_to_wait = self.target_spf - (time() - start_time)
-        #    if time_to_wait > 0:
-        #        sleep(time_to_wait)
-        #    self.gui.render(self.grid, self.agent_pos, self.info,
-        #                    reward, is_single_step)
+        # GUI specific code
+        if self.gui is not None:
+            self.gui.render(None, self.agent_pos, self.info, self.world_stats, reward, is_single_step)
 
         return self.agent_pos, reward, self.terminal_state, self.info
 
