@@ -1,8 +1,9 @@
 # world/cont_gui.py
 
 import pygame
+from world.cont_grid import Grid
 import numpy as np
-from pygame.locals import QUIT, KEYDOWN, K_SPACE, K_RIGHT, MOUSEBUTTONDOWN, MOUSEBUTTONUP
+from pygame.locals import QUIT, KEYDOWN, K_SPACE, K_RIGHT, MOUSEBUTTONDOWN
 
 
 class GUI:
@@ -12,7 +13,7 @@ class GUI:
 
     def __init__(self,
                  world_size: tuple[float, float],
-                 window_size: tuple[int, int] = (1400, 800),
+                 window_size: tuple[int, int] = (1152, 768),
                  fps: int = 30):
         pygame.init()
         pygame.display.init()
@@ -39,6 +40,8 @@ class GUI:
 
         # Colors
         self.bg_color = (250, 250, 250)
+        self.obstacle_color = (100, 100, 100)
+        self.target_color = (0, 255, 0)
         self.agent_color = (0, 0, 255)
         self.arrow_color = (255, 0, 0)
         self.text_color = (0, 0, 0)
@@ -83,11 +86,11 @@ class GUI:
         pygame.display.flip()
 
     def render(self,
-               grid,
                agent_pos: tuple[float, float, float],
                info: dict,
                world_stats: dict,
                reward: float,
+               grid: Grid = None,
                is_single_step: bool = False,
                target_pos: tuple[float, float] = None,
                target_radius: float = None):
@@ -112,6 +115,26 @@ class GUI:
         # Clear the world area
         self.screen.fill(self.bg_color, self.world_rect)
 
+        # Draw each obstacle cell as a filled rect before drawing agent/target:
+        if grid is not None:
+            for (r, c) in grid.get_all_obstacle_cells():
+                x0 = grid.x_min + c * grid.cell_width
+                y0 = grid.y_min + r * grid.cell_height
+                x1 = x0 + grid.cell_width
+                y1 = y0 + grid.cell_height
+
+                screen_x0, screen_y0 = self.world_to_screen((x0, y0, 0.0))
+                screen_x1, screen_y1 = self.world_to_screen((x1, y1, 0.0))
+
+                left = min(screen_x0, screen_x1)
+                top = min(screen_y0, screen_y1)
+                width = abs(screen_x1 - screen_x0)
+                height = abs(screen_y1 - screen_y0)
+
+                pygame.draw.rect(self.screen,
+                                 self.obstacle_color,
+                                 pygame.Rect(left, top, width, height))
+
         # Draw the agent (circle + arrow)
         sx, sy = self.world_to_screen(agent_pos)
         pygame.draw.circle(self.screen, self.agent_color, (sx, sy), 8)
@@ -127,9 +150,10 @@ class GUI:
                          (div_x, 0), (div_x, self.screen_height), 3)
 
         # Draw the target (circular)
-        target_screen_pos = self.world_to_screen((target_pos[0], target_pos[1], 0))
-        scaled_radius = int(target_radius * (self.world_rect.width / self.world_width))
-        pygame.draw.circle(self.screen, (0, 200, 0), target_screen_pos, scaled_radius)
+        if target_pos is not None and target_radius is not None:
+            target_screen_pos = self.world_to_screen((target_pos[0], target_pos[1], 0))
+            scaled_radius = int(target_radius * (self.world_rect.width / self.world_width))
+            pygame.draw.circle(self.screen, (0, 200, 0), target_screen_pos, scaled_radius)
 
         # Draw the info panel
         pygame.draw.rect(self.screen, self.panel_bg, self.info_rect)
@@ -138,6 +162,9 @@ class GUI:
         lines = [
             f"Total Steps: {self.total_steps}",
             f"Cumulative Reward: {self.cumulative_reward:.2f}",
+            f"Agent X: {agent_pos[0]:.2f}",
+            f"Agent Y: {agent_pos[1]:.2f}",
+            f"Agent Rotation: {agent_pos[2]:.2f}",
         ]
         text_x = self.info_rect.left + 10
         text_y = 10
@@ -196,7 +223,7 @@ class GUI:
             elif event.type == KEYDOWN and event.key == K_RIGHT and self.paused:
                 self.step_requested = True
 
-            # Mouse clicks: check if buttons were clicked
+            # Mouse clicks: check if buttons were clicked?
             elif event.type == MOUSEBUTTONDOWN:
                 mx, my = event.pos
 

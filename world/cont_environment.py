@@ -13,8 +13,8 @@ from world.helpers import save_results, action_to_direction
 
 try:
     from agents import BaseAgent
-    from world.grid import Grid
     from world.cont_gui import GUI
+    from world.cont_grid import Grid
     from world.path_visualizer import visualize_path
 except ModuleNotFoundError:
     from os import path
@@ -29,7 +29,6 @@ except ModuleNotFoundError:
         sys.path.append(root_path)
 
     from agents import BaseAgent
-    from world.grid import Grid
     from world.gui import GUI
     from world.path_visualizer import visualize_path
 
@@ -39,7 +38,7 @@ class Cont_Environment:
     def __init__(self,
                  forward_speed: float = 0.1, # TODO: Maybe put robot parameters like these in a config file?
                  rotation_speed: float = np.pi/12,
-                 #grid_fp: Path,
+                 grid: Grid = None,
                  no_gui: bool = False,
                  #sigma: float = 0.,
                  agent_start_pos: tuple[float, float, float] = None, # Start pos is defined by (x,y,phi) coordinates
@@ -71,26 +70,34 @@ class Cont_Environment:
             random_seed: The random seed to use for this environment. If None
                 is provided, then the seed will be set to 0.
         """
-        random.seed(random_seed)
-
-        # Initialize environment
-        # For now the environment is empty; no obstacles or targets. 
-        # The only things are the walls, which are for now hardcoded at x=-10, x=10, y=-10 and y=10.
-        # These bounds should be defined in the file that saves the environment layout (once we've decided what that should look like)
-        self.x_bounds = [-1,1]
-        self.y_bounds = [-1,1]
-
-        # Initialize other variables
+        self.grid = grid
         self.forward_speed = forward_speed
         self.rotation_speed = rotation_speed
-
-        # Target and target radius
-        self.target_pos = np.array([0.3, 0.3])    # Random location for now
-        self.target_radius = self.forward_speed * 1.5    # Size of the target. 1.5 times the step size so that it cannot overshoot
-
         self.agent_start_pos = agent_start_pos
         self.terminal_state = False
-        #self.sigma = sigma
+
+        # Initialize environment if a grid was provided
+        if grid is not None:
+            print("Grid successfuly loaded")
+            self.grid = grid
+            # Override x_bounds, y_bounds to match the world_size used by the Grid:
+            self.x_bounds = [grid.x_min, grid.x_min + grid.world_width]
+            self.y_bounds = [grid.y_min, grid.y_min + grid.world_height]
+
+            # Place the target exactly at the grid cell marked “2”:
+            tx, ty = self.grid.get_target_position()
+            self.target_pos = np.array([tx, ty])
+            self.target_radius = self.forward_speed * 1.5
+
+        # Otherwise if None, create a 4x4 world and create a target at a uniformly random place within the grid
+        else:
+            self.x_bounds = [-2,2]
+            self.y_bounds = [-2,2]
+
+            # Target and target radius
+            self.target_pos = np.array([random.uniform(self.x_bounds[0], self.x_bounds[1]),
+                                        random.uniform(self.y_bounds[0], self.y_bounds[1])])
+            self.target_radius = self.forward_speed * 1.5    # Size of the target. 1.5 times the step size so that it cannot overshoot
               
         # Set up reward function
         if reward_fn is None:
@@ -105,7 +112,7 @@ class Cont_Environment:
             world_width = self.x_bounds[1] - self.x_bounds[0]
             world_height = self.y_bounds[1] - self.y_bounds[0]
             self.gui = GUI(world_size=(world_width, world_height),
-                           window_size=(1400, 800),
+                           window_size=(1152, 768),
                            fps=30)
             self.gui.reset()
         else:
@@ -204,9 +211,6 @@ class Cont_Environment:
         Args:
             new_pos: The new (x,y,phi) position of the agent.
         """
-
-        # Check if the new position is inside an obstacle
-        # TODO
         # Check if the new position is out of bounds (can maybe be combined with check above)
         if self.out_of_bounds(new_pos):
             self.world_stats["total_failed_moves"] += 1
@@ -245,8 +249,8 @@ class Cont_Environment:
             if self.gui.paused and not self.gui.step_requested:
                 paused_info = self._reset_info()
                 paused_info["agent_moved"] = False
-                self.gui.render(None, self.agent_pos, paused_info, self.world_stats, 0.0, False, self.target_pos, self.target_radius)
-                return self.agent_pos, 0.0, self.terminal_state, self.info
+                self.gui.render(self.agent_pos, paused_info, self.world_stats, 0.0, self.grid, False, self.target_pos, self.target_radius)
+                return self.agent_pos, 0.0, self.terminal_state, self.info, self.world_stats
 
             #If single-step was requested, clear that flag and proceed exactly one step
             if self.gui.step_requested:
@@ -281,10 +285,33 @@ class Cont_Environment:
         elif actual_action == 2: # Rotate right by rotation_speed radians
             new_pos = (self.agent_pos[0], self.agent_pos[1], (self.agent_pos[2] - self.rotation_speed) % (2*np.pi))
         else: # Stop (do nothing) - useless for now, but this will be replaced with a "decelerate" action later.
-            new_pos = self.agent_pos 
+            new_pos = self.agent_pos
+
+        # Obstacle collision check
+        if self.grid is not None:
+            if self.grid.is_obstacle(new_pos[0], new_pos[1]):
+                # Apply the same penalty as “out-of-bounds”
+                reward = -10
+
+                self.world_stats["total_failed_moves"] += 1
+                self.info["agent_moved"] = False
+
+                if self.gui is not None:
+                    self.gui.render(
+                        self.agent_pos,
+                        self.info,
+                        self.world_stats,
+                        reward,
+                        self.grid,
+                        is_single_step,
+                        self.target_pos,
+                        self.target_radius
+                    )
+
+                # Early‐return exactly as out-of-bounds would
+                return self.agent_pos, reward, self.terminal_state, self.info, self.world_stats
 
         # Calculate the reward for the agent
-
         # TODO; for now reward is always -1
         reward = self.reward_fn(self, new_pos)
 
@@ -294,9 +321,9 @@ class Cont_Environment:
 
         # GUI specific code
         if self.gui is not None:
-            self.gui.render(None, self.agent_pos, self.info, self.world_stats, reward, is_single_step, self.target_pos, self.target_radius)
+            self.gui.render(self.agent_pos, self.info, self.world_stats, reward, self.grid, is_single_step, self.target_pos, self.target_radius)
 
-        return self.agent_pos, reward, self.terminal_state, self.info
+        return self.agent_pos, reward, self.terminal_state, self.info, self.world_stats
 
     @staticmethod
     def _default_reward_function(self, new_pos) -> float:
