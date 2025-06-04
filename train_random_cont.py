@@ -1,6 +1,7 @@
 import numpy as np
 from agents.random_agent import RandomAgent
 from world.cont_environment import Cont_Environment
+from world.cont_path_visualizer import visualize_path_cont_env
 
 def main():
     """
@@ -15,17 +16,23 @@ def main():
     )
 
     agent = RandomAgent()
+    agent_path = []    # for the agent path
 
     try:
         state = env.reset()
+        agent_path.append(state)
         done = False
 
         while not done:
             action = agent.take_action(state)          # returns 0,1,2,3 with your probabilities
             next_state, reward, done, info = env.step(action)
             state = next_state
+            agent_path.append(state)
 
         print("Episode finished. Total steps:", info.get("total_steps", "N/A"))
+
+        # Save the image of the agent path
+        visualize_path_cont_env(env, agent_path)
 
     except KeyboardInterrupt:
         print("User closed the window. Exiting.")

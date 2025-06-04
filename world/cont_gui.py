@@ -88,7 +88,9 @@ class GUI:
                info: dict,
                world_stats: dict,
                reward: float,
-               is_single_step: bool = False):
+               is_single_step: bool = False,
+               target_pos: tuple[float, float] = None,
+               target_radius: float = None):
         """
         Draw the current frame. Call once per environment step.
 
@@ -99,6 +101,8 @@ class GUI:
             world_stats: contains total steps
             reward: float reward from this step
             is_single_step: True if this call comes from a single-step action
+            target_pos: coordinates of the target
+            target_radius: size of the target
         """
 
         # Update stats from world_stats + reward
@@ -121,6 +125,11 @@ class GUI:
         div_x = self.world_rect.width
         pygame.draw.line(self.screen, self.divider_color,
                          (div_x, 0), (div_x, self.screen_height), 3)
+
+        # Draw the target (circular)
+        target_screen_pos = self.world_to_screen((target_pos[0], target_pos[1], 0))
+        scaled_radius = int(target_radius * (self.world_rect.width / self.world_width))
+        pygame.draw.circle(self.screen, (0, 200, 0), target_screen_pos, scaled_radius)
 
         # Draw the info panel
         pygame.draw.rect(self.screen, self.panel_bg, self.info_rect)

@@ -77,12 +77,16 @@ class Cont_Environment:
         # For now the environment is empty; no obstacles or targets. 
         # The only things are the walls, which are for now hardcoded at x=-10, x=10, y=-10 and y=10.
         # These bounds should be defined in the file that saves the environment layout (once we've decided what that should look like)
-        self.x_bounds = [-10,10]
-        self.y_bounds = [-10,10]
+        self.x_bounds = [-1,1]
+        self.y_bounds = [-1,1]
 
         # Initialize other variables
         self.forward_speed = forward_speed
         self.rotation_speed = rotation_speed
+
+        # Target and target radius
+        self.target_pos = np.array([0.3, 0.3])    # Random location for now
+        self.target_radius = self.forward_speed * 1.5    # Size of the target. 1.5 times the step size so that it cannot overshoot
 
         self.agent_start_pos = agent_start_pos
         self.terminal_state = False
@@ -241,7 +245,7 @@ class Cont_Environment:
             if self.gui.paused and not self.gui.step_requested:
                 paused_info = self._reset_info()
                 paused_info["agent_moved"] = False
-                self.gui.render(None, self.agent_pos, paused_info, self.world_stats, 0.0, False)
+                self.gui.render(None, self.agent_pos, paused_info, self.world_stats, 0.0, False, self.target_pos, self.target_radius)
                 return self.agent_pos, 0.0, self.terminal_state, self.info
 
             #If single-step was requested, clear that flag and proceed exactly one step
@@ -290,7 +294,7 @@ class Cont_Environment:
 
         # GUI specific code
         if self.gui is not None:
-            self.gui.render(None, self.agent_pos, self.info, self.world_stats, reward, is_single_step)
+            self.gui.render(None, self.agent_pos, self.info, self.world_stats, reward, is_single_step, self.target_pos, self.target_radius)
 
         return self.agent_pos, reward, self.terminal_state, self.info
 
@@ -314,6 +318,10 @@ class Cont_Environment:
         """
         if self.out_of_bounds(new_pos):
             reward = -10
+        elif np.linalg.norm(np.array(new_pos[:2]) - self.target_pos) <= self.target_radius:
+            reward = 10
+            self.terminal_state = True
+            self.info["target_reached"] = True
         else:
             reward = -0.1
 
