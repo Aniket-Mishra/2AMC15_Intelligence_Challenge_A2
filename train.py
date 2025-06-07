@@ -61,8 +61,8 @@ def main(grid_paths: list[Path], no_gui: bool, iters: int, fps: int, sigma: floa
         # Agent takes an action based on the latest observation and info.
         action = agent.take_action(state)
 
-        # The action is performed in the environment
-        state, reward, terminated, info = env.step(action)
+        # The action is performed in the environment + world stats
+        sstate, reward, terminated, info, world_stats = env.step(action)
 
         # Until GUI is done, just print info about step for now
         print(f"it {i}: took action {action}, new position {state}, received reward {reward}")

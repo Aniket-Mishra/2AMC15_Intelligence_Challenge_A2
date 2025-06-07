@@ -10,6 +10,7 @@ from warnings import warn
 from time import time, sleep
 from datetime import datetime
 from world.helpers import save_results, action_to_direction
+from world.cont_path_visualizer import visualize_path_cont_env
 
 try:
     from agents import BaseAgent
@@ -407,13 +408,16 @@ class Cont_Environment:
         for _ in trange(max_steps, desc="Evaluating agent"):
             
             action = agent.take_action(state)
-            state, _, terminated, _ = env.step(action)
+            state, _, terminated, _, _ = env.step(action)
 
             agent_path.append(state)
 
             if terminated:
                 break
-
+        
+        # Once evaluation is done (early‐stop or full run), save the path image:
+        visualize_path_cont_env(env, agent_path)
+        print(f"\n✅ Evaluation finished after {len(agent_path)-1} steps — trajectory saved in results/") 
         #env.world_stats["targets_remaining"] = np.sum(env.grid == 3)
 
         # TODO: Replace visualize_path function

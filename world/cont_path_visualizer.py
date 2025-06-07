@@ -18,7 +18,14 @@ def visualize_path_cont_env(env, agent_path, save_dir="results", image_size=None
 
     # Create a new directory if not there yet and create filename
     os.makedirs(save_dir, exist_ok=True)
-    image_size = (env.gui.world_rect.width, env.gui.world_rect.height)
+    if image_size is None:
+        if getattr(env, "gui", None) is not None:
+            # we have a GUI—use its world‐rect dimensions
+            image_size = (env.gui.world_rect.width, env.gui.world_rect.height)
+        else:
+            # no GUI—pick a reasonable default canvas size
+            image_size = (902, 768)
+
     timestamp = datetime.now().strftime("%Y-%m-%d__%H-%M-%S")
     save_path = os.path.join(save_dir, f"{timestamp}.png")
 
