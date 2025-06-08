@@ -76,6 +76,8 @@ class Cont_Environment:
         self.rotation_speed = rotation_speed
         self.agent_start_pos = agent_start_pos
         self.terminal_state = False
+        self.state_dim  = 3   # because reset() returns (x,y,phi) # If you change the number of features also change this
+        self.action_dim = 4   # because step() accepts 0,1,2,3 only # If you change the number of actions also change this
 
         # Initialize environment if a grid was provided
         if grid is not None:
@@ -287,6 +289,25 @@ class Cont_Environment:
             new_pos = (self.agent_pos[0], self.agent_pos[1], (self.agent_pos[2] - self.rotation_speed) % (2*np.pi))
         else: # Stop (do nothing) - useless for now, but this will be replaced with a "decelerate" action later.
             new_pos = self.agent_pos
+
+        # out‐of‐bounds: stay, big penalty, terminate
+        if self.out_of_bounds(new_pos):
+            reward = -10 #SET LOW
+            self.terminal_state = True
+            self.world_stats["total_failed_moves"] += 1
+            self.info["agent_moved"] = False
+            if self.gui is not None:
+                self.gui.render(
+                    self.agent_pos,
+                    self.info,
+                    self.world_stats,
+                    reward,
+                    self.grid,
+                    is_single_step,
+                    self.target_pos,
+                    self.target_radius
+                )
+            return self.agent_pos, reward, self.terminal_state, self.info, self.world_stats
 
         # Obstacle collision check
         if self.grid is not None:
