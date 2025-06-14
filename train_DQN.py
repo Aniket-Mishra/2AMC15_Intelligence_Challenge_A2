@@ -4,7 +4,7 @@ import numpy as np
 from agents.DQN_agent import DQNAgent
 from world.cont_environment import Cont_Environment
 from world.cont_path_visualizer import visualize_path_cont_env
-from world.cont_grid_config import load_grid
+from world.wall_grid import load_grid
 from world.cont_grid import Grid
 import math
 

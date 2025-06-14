@@ -37,8 +37,8 @@ except ModuleNotFoundError:
 
 class Cont_Environment:
     def __init__(self,
-                 forward_speed: float = 0.1, # TODO: Maybe put robot parameters like these in a config file?
-                 rotation_speed: float = np.pi/12,
+                 forward_speed: float = 0.2,
+                 rotation_speed: float = np.pi/6,
                  grid: Grid = None,
                  no_gui: bool = False,
                  #sigma: float = 0.,
@@ -81,16 +81,28 @@ class Cont_Environment:
 
         # Initialize environment if a grid was provided
         if grid is not None:
-            print("Grid successfuly loaded")
-            self.grid = grid
-            # Override x_bounds, y_bounds to match the world_size used by the Grid:
-            self.x_bounds = [grid.x_min, grid.x_min + grid.world_width]
-            self.y_bounds = [grid.y_min, grid.y_min + grid.world_height]
+            if grid.get_name() == "wall_grid":
+                print("Wall grid successfuly loaded")
+                self.grid = grid
+                # Override x_bounds, y_bounds to match the world_size used by the Grid:
+                self.x_bounds = [grid.x_min, grid.x_min + grid.world_width]
+                self.y_bounds = [grid.y_min, grid.y_min + grid.world_height]
 
-            # Place the target exactly at the grid cell marked “2”:
-            tx, ty = self.grid.get_target_position()
-            self.target_pos = np.array([tx, ty])
-            self.target_radius = self.forward_speed * 1.5
+                self.target_pos = np.array([1.25, 1.25])
+                self.target_radius = self.forward_speed * 1.5
+
+            elif grid.get_name() == "table_grid":
+                print("Table grid successfuly loaded")
+                self.grid = grid
+                # Override x_bounds, y_bounds to match the world_size used by the Grid:
+                self.x_bounds = [grid.x_min, grid.x_min + grid.world_width]
+                self.y_bounds = [grid.y_min, grid.y_min + grid.world_height]
+
+                self.target_pos = np.array([0.75, 0.75])
+                self.target_radius = self.forward_speed * 2
+
+            else:
+                raise ValueError("Grid name not found")
 
         # Otherwise if None, create a 4x4 world and create a target at a uniformly random place within the grid
         else:
@@ -100,7 +112,7 @@ class Cont_Environment:
             # Target and target radius
             self.target_pos = np.array([random.uniform(self.x_bounds[0], self.x_bounds[1]),
                                         random.uniform(self.y_bounds[0], self.y_bounds[1])])
-            self.target_radius = self.forward_speed * 1.5    # Size of the target. 1.5 times the step size so that it cannot overshoot
+            self.target_radius = self.forward_speed * 2    # Size of the target. 1.5 times the step size so that it cannot overshoot
               
         # Set up reward function
         if reward_fn is None:
@@ -293,7 +305,7 @@ class Cont_Environment:
         # out‐of‐bounds: stay, big penalty, terminate
         if self.out_of_bounds(new_pos):
             reward = -10 #SET LOW
-            self.terminal_state = True
+            self.terminal_state = False
             self.world_stats["total_failed_moves"] += 1
             self.info["agent_moved"] = False
             if self.gui is not None:

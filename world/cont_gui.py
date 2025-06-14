@@ -115,6 +115,12 @@ class GUI:
         # Clear the world area
         self.screen.fill(self.bg_color, self.world_rect)
 
+        # Draw the target (circular)
+        if target_pos is not None and target_radius is not None:
+            target_screen_pos = self.world_to_screen((target_pos[0], target_pos[1], 0))
+            scaled_radius = int(target_radius * (self.world_rect.width / self.world_width))
+            pygame.draw.circle(self.screen, (0, 200, 0), target_screen_pos, scaled_radius)
+
         # Draw each obstacle cell as a filled rect before drawing agent/target:
         if grid is not None:
             for (r, c) in grid.get_all_obstacle_cells():
@@ -148,12 +154,6 @@ class GUI:
         div_x = self.world_rect.width
         pygame.draw.line(self.screen, self.divider_color,
                          (div_x, 0), (div_x, self.screen_height), 3)
-
-        # Draw the target (circular)
-        if target_pos is not None and target_radius is not None:
-            target_screen_pos = self.world_to_screen((target_pos[0], target_pos[1], 0))
-            scaled_radius = int(target_radius * (self.world_rect.width / self.world_width))
-            pygame.draw.circle(self.screen, (0, 200, 0), target_screen_pos, scaled_radius)
 
         # Draw the info panel
         pygame.draw.rect(self.screen, self.panel_bg, self.info_rect)

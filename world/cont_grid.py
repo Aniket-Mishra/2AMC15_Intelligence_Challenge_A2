@@ -8,7 +8,8 @@ class Grid:
     """
     def __init__(self,
                  cells: np.ndarray,
-                 world_size: tuple[float, float]):
+                 world_size: tuple[float, float],
+                 name: str = None):
         """
         :param cells: 2D numpy array of shape (n_rows, n_cols).  Values:
                        0=empty, 1=obstacle, 2=target.
@@ -27,6 +28,8 @@ class Grid:
 
         self.x_min = -self.world_width / 2.0
         self.y_min = -self.world_height / 2.0
+
+        self.name = name
 
     def continuous_to_cell(self, x: float, y: float) -> tuple[int, int]:
         """
@@ -49,29 +52,12 @@ class Grid:
         row, col = self.continuous_to_cell(x, y)
         return self.cells[row, col] == 1
 
-    def is_target_cell(self, row: int, col: int) -> bool:
-        return self.cells[row, col] == 2
-
-    def get_target_position(self) -> tuple[float, float]:
-        """
-        Find the first cell with value==2 and return its continuous (center) coordinates.
-        If there are multiple targets, pick the first one.
-        Center of cell (r,c) is:
-           x = x_min + (c+0.5)*cell_width
-           y = y_min + (r+0.5)*cell_height
-        """
-        where = np.argwhere(self.cells == 2)
-        if where.size == 0:
-            raise RuntimeError("Grid contains no target (no cell == 2).")
-        r, c = where[0]
-        # Compute the continuous coordinates of the cell’s center:
-        center_x = self.x_min + (c + 0.5) * self.cell_width
-        center_y = self.y_min + (r + 0.5) * self.cell_height
-        return center_x, center_y
-
     def get_all_obstacle_cells(self) -> list[tuple[int, int]]:
         """
         Returns a list of (row, col) pairs where cells[row,col] == 1.
         """
         idxs = np.argwhere(self.cells == 1)
         return [(int(r), int(c)) for (r, c) in idxs]
+
+    def get_name(self) -> str:
+        return self.name

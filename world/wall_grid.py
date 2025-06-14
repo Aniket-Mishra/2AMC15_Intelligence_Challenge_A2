@@ -1,9 +1,11 @@
 # world/grid_config.py
+from typing import Tuple, Any
 
 import numpy as np
+from numpy import ndarray, dtype
 
 
-def load_grid() -> np.ndarray:
+def load_grid() -> tuple[ndarray[Any, dtype[Any]], tuple[float, int, float]]:
     """
     Returns a 2D numpy array of integers, where:
       0 = empty cell
@@ -24,7 +26,6 @@ def load_grid() -> np.ndarray:
     for i in range(16):
         grid[12, -i] = 1
 
-    # 4) Example target
-    grid[18, 18] = 2
+    starting_position = (1.25, -1, 0.0)
 
-    return grid
+    return grid, starting_position
