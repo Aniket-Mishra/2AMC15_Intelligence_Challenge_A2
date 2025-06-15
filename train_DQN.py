@@ -106,7 +106,7 @@ if __name__ == "__main__":
     # Args via sys.argv
     grid_arg = sys.argv[1] if len(sys.argv) > 1 else None
     episodes = int(sys.argv[2]) if len(sys.argv) > 2 else 500
-    max_steps = int(sys.argv[3]) if len(sys.argv) > 3 else 500
+    max_steps = int(sys.argv[3]) if len(sys.argv) > 3 else 200
     random_seed = int(sys.argv[4]) if len(sys.argv) > 4 else 42
 
     main(grid_arg, episodes, max_steps, random_seed)
