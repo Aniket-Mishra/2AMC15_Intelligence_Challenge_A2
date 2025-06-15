@@ -4,6 +4,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim as optim
+from torch.cuda.amp import autocast, GradScaler
 
 from agents import BaseAgent
 
@@ -21,12 +22,8 @@ class QNetwork(nn.Module):
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         return self.layers(x)
 
-# ---------------------- SumTree for PER -----------------------
+
 class SumTree:
-    """
-    A binary tree data structure where each parent’s value is the sum of its children.
-    Used to sample transitions proportional to their priority.
-    """
     def __init__(self, capacity):
         self.capacity = capacity
         self.tree = np.zeros(2 * capacity - 1)
@@ -71,7 +68,7 @@ class SumTree:
     def total(self):
         return self.tree[0]
 
-# ---------------- Prioritized Replay Buffer ------------------
+
 class PrioritizedReplayBuffer:
     def __init__(self, capacity, alpha=0.3):
         self.tree = SumTree(capacity)
@@ -79,6 +76,8 @@ class PrioritizedReplayBuffer:
         self.epsilon = 1e-6
 
     def push(self, state, action, reward, next_state, done, td_error=None):
+        state = torch.FloatTensor(state)
+        next_state = torch.FloatTensor(next_state)
         if td_error is not None:
             prio = (abs(td_error) + self.epsilon) ** self.alpha
         else:
@@ -90,14 +89,13 @@ class PrioritizedReplayBuffer:
         self.tree.add(prio, (state, action, reward, next_state, done))
 
     def sample(self, batch_size, beta=0.4):
-        # 10% uniform sampling
         if random.random() < 0.1:
             data_idxs = np.random.choice(self.tree.n_entries, batch_size, replace=False)
             batch = [self.tree.data[i] for i in data_idxs]
             idxs = [i + self.tree.capacity - 1 for i in data_idxs]
             is_weights = np.ones(batch_size, dtype=np.float32)
             states, actions, rewards, next_states, dones = zip(*batch)
-            return (np.array(states), actions, rewards, np.array(next_states),
+            return (torch.stack(states), actions, rewards, torch.stack(next_states),
                     dones, idxs, is_weights)
 
         batch, idxs, priorities = [], [], []
@@ -114,19 +112,19 @@ class PrioritizedReplayBuffer:
         is_weights = np.power(self.tree.n_entries * sampling_probabilities, -beta)
         is_weights /= is_weights.max()
         states, actions, rewards, next_states, dones = zip(*batch)
-        return (np.array(states), actions, rewards, np.array(next_states),
+        return (torch.stack(states), actions, rewards, torch.stack(next_states),
                 dones, idxs, is_weights)
 
     def update_priorities(self, idxs, td_errors):
-        for idx, td in zip(idxs, td_errors):
-            clipped = np.sign(td) * min(abs(td), 1.0)
-            prio = (abs(clipped) + self.epsilon) ** self.alpha
+        td_errors = np.clip(td_errors, -1.0, 1.0)
+        priorities = (np.abs(td_errors) + self.epsilon) ** self.alpha
+        for idx, prio in zip(idxs, priorities):
             self.tree.update(idx, prio)
 
     def __len__(self):
         return self.tree.n_entries
 
-# ------------------------ DQN Agent ---------------------------
+
 class DQNAgent(BaseAgent):
     def __init__(
         self,
@@ -151,6 +149,7 @@ class DQNAgent(BaseAgent):
         self.target_net.load_state_dict(self.policy_net.state_dict())
         self.target_net.eval()
         self.optimizer = optim.Adam(self.policy_net.parameters(), lr=lr)
+        self.scaler = GradScaler()
 
         self.replay_buffer = PrioritizedReplayBuffer(buffer_size, alpha=per_alpha)
         self.batch_size = batch_size
@@ -166,6 +165,7 @@ class DQNAgent(BaseAgent):
         self.failure_weight = failure_weight
 
     def select_action(self, state: np.ndarray) -> int:
+        self.policy_net.eval()
         eps_threshold = self.epsilon_end + (
             self.epsilon_start - self.epsilon_end
         ) * np.exp(-1.0 * self.steps_done / self.epsilon_decay)
@@ -180,14 +180,7 @@ class DQNAgent(BaseAgent):
     def take_action(self, state: tuple[float, float, float]) -> int:
         return self.select_action(np.array(state, dtype=np.float32))
 
-    def store_transition(
-        self,
-        state,
-        action,
-        reward,
-        next_state,
-        done: bool
-    ):
+    def store_transition(self, state, action, reward, next_state, done: bool):
         self.replay_buffer.push(state, action, reward, next_state, done)
 
     def learn(self):
@@ -195,30 +188,37 @@ class DQNAgent(BaseAgent):
             return
         beta = min(1.0, self.per_beta_start + (1.0 - self.per_beta_start) *
                     (self.steps_done / self.per_beta_frames))
-        states, actions, rewards, next_states, dones, idxs, is_weights = \
+
+        states_t, actions, rewards, next_states_t, dones, idxs, is_weights = \
             self.replay_buffer.sample(self.batch_size, beta)
 
-        states_t = torch.FloatTensor(states).to(self.device)
+        states_t = states_t.to(self.device)
         actions_t = torch.LongTensor(actions).unsqueeze(1).to(self.device)
         rewards_t = torch.FloatTensor(rewards).unsqueeze(1).to(self.device)
-        next_states_t = torch.FloatTensor(next_states).to(self.device)
+        next_states_t = next_states_t.to(self.device)
         dones_t = torch.FloatTensor(dones).unsqueeze(1).to(self.device)
         is_weights_t = torch.FloatTensor(is_weights).unsqueeze(1).to(self.device)
 
-        current_q = self.policy_net(states_t).gather(1, actions_t)
-        next_q = self.target_net(next_states_t).max(dim=1, keepdim=True)[0].detach()
-        target_q = rewards_t + (1.0 - dones_t) * self.gamma * next_q
+        self.policy_net.train()
+        with autocast():
+            current_q = self.policy_net(states_t).gather(1, actions_t)
+            with torch.no_grad():
+                next_q = self.target_net(next_states_t).max(dim=1, keepdim=True)[0]
+            target_q = rewards_t + (1.0 - dones_t) * self.gamma * next_q
 
-        # down-weight failure steps by parameterizable factor
-        weight_factor = dones_t + self.failure_weight * (1 - dones_t)
-        loss = (is_weights_t * weight_factor * (current_q - target_q).pow(2)).mean()
+            weight_factor = dones_t + self.failure_weight * (1 - dones_t)
+            loss = (is_weights_t * weight_factor * (current_q - target_q).pow(2)).mean()
 
         self.optimizer.zero_grad()
-        loss.backward()
-        self.optimizer.step()
+        self.scaler.scale(loss).backward()
+        self.scaler.step(self.optimizer)
+        self.scaler.update()
 
         td_errors = (target_q - current_q).detach().cpu().numpy().squeeze()
         self.replay_buffer.update_priorities(idxs, td_errors)
+
+        if self.steps_done % self.target_update == 0:
+            self.target_net.load_state_dict(self.policy_net.state_dict())
 
     def finalize_training(self):
         self.epsilon_start = 0.0
