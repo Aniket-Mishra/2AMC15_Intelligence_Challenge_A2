@@ -1,3 +1,4 @@
+import argparse
 import sys
 import os
 import numpy as np
@@ -14,7 +15,6 @@ from agents.PPO_agent import PPOAgent
 from agents.random_agent import RandomAgent
 
 from world.cont_environment import Cont_Environment
-from world.wall_grid import load_grid
 from world.cont_grid import Grid
 
 from world.path_visualizer import visualize_path  # <-- Use your own PIL grid/path visualizer
@@ -27,13 +27,15 @@ AGENT_CLASSES = {
     "random": RandomAgent,
 }
 
+
+#TODO I removed most of the values for DQN and PPO from args, because thats too many args to pass. We can add these to a config file instead
 def get_agent_config(agent_name, state_dim, action_dim, args):
     if agent_name == "dqn":
-        EPS_START = args.get("epsilon_start", 1.0)
-        EPS_END = args.get("epsilon_end", 0.01)
+        EPS_START = 1.0
+        EPS_END = 0.01
         r = 0.01
         ratio = 0.3
-        total_steps = args["episodes"] * args["max_steps"]
+        total_steps = args.episodes * args.max_steps
         t_target = int(ratio * total_steps)
         epsilon_decay = int(-t_target / math.log(r))
         return dict(
@@ -47,41 +49,67 @@ def get_agent_config(agent_name, state_dim, action_dim, args):
         return dict(
             state_dim=state_dim,
             action_dim=action_dim,
-            gamma=args.get("gamma", 0.99),
-            lr=args.get("lr", 3e-4),
-            clip_epsilon=args.get("clip_epsilon", 0.1),
-            update_epochs=args.get("update_epochs", 10),
-            batch_size=args.get("batch_size", 64),
-            gae_lambda=args.get("gae_lambda", 0.95)
+            gamma=0.99,
+            lr=3e-4,
+            clip_epsilon=0.1,
+            update_epochs=10,
+            batch_size=64,
+            gae_lambda=0.95
         )
     elif agent_name == "random":
         return {}
     else:
         raise ValueError(f"Unknown agent type: {agent_name}")
 
+
 def get_filename(prefix, agent_name, agent_config, timestamp, extension):
     cfg_str = "_".join(f"{k}{v}" for k, v in agent_config.items())
     return f"{prefix}_{agent_name}_{cfg_str}_{timestamp}.{extension}"
 
+
 def main(args):
+    print(args)
     Path("results_common/logs").mkdir(parents=True, exist_ok=True)
     Path("results_common/graph_path").mkdir(parents=True, exist_ok=True)
     Path("results_common/rewards").mkdir(parents=True, exist_ok=True)
     Path("results_common/graphs").mkdir(parents=True, exist_ok=True)
 
-    if args["grid_arg"] is None or args["grid_arg"].lower() == "none":
+    if args.grid is None or args.grid == "none":
         grid = None
-        print("→ Running with no grid (4×4 world)")
+        starting_pos = (0, 0, 0.0)
+        print("Running with no grid (grid=None).")
+    elif args.grid == "wall":
+        try:
+            from world.wall_grid import load_grid
+        except ImportError:
+            raise RuntimeError(
+                "Could not find world/wall_grid.py or load_grid() inside it."
+            )
+        # load_grid() should return a 2D numpy array of ints
+        raw_cells, starting_pos = load_grid()
+        world_size = (4.0, 4.0)
+        grid = Grid(raw_cells, world_size, "wall_grid")
+        print("Loaded grid from wall_grid.py.")
+    elif args.grid == "table":
+        try:
+            from world.table_grid import load_grid
+        except ImportError:
+            raise RuntimeError(
+                "Could not find world/table_grid.py or load_grid() inside it."
+            )
+        # load_grid() should return a 2D numpy array of ints
+        raw_cells, starting_pos = load_grid()
+        world_size = (4.0, 4.0)
+        grid = Grid(raw_cells, world_size, "table_grid")
+        print("Loaded grid from table_grid.py.")
     else:
-        raw_cells = load_grid()
-        grid = Grid(raw_cells, world_size=(4.0, 4.0))
-        print("→ Loaded grid for 4×4 world.")
+        raise ValueError(f"Unknown grid type: {args.grid}")
 
-    env = Cont_Environment(no_gui=True, grid=grid, random_seed=args["random_seed"])
+    env = Cont_Environment(no_gui=args.no_gui, grid=grid, random_seed=args.random_seed, agent_start_pos=starting_pos)
     state_dim = env.state_dim
     action_dim = env.action_dim
 
-    agent_name = args.get("agent", "dqn").lower()
+    agent_name = args.agent
     AgentClass = AGENT_CLASSES.get(agent_name)
     if AgentClass is None:
         raise ValueError(f"Unknown agent '{agent_name}'. Available: {list(AGENT_CLASSES)}")
@@ -89,8 +117,8 @@ def main(args):
     agent_cfg = get_agent_config(agent_name, state_dim, action_dim, args)
     agent = AgentClass(**agent_cfg) if agent_cfg else AgentClass()
 
-    episodes = args["episodes"]
-    max_steps = args["max_steps"]
+    episodes = args.episodes
+    max_steps = args.max_steps
 
     metrics = []
     episode_rewards = []
@@ -156,7 +184,8 @@ def main(args):
             "avg_last_100": running_rewards[-1]
         })
 
-        print(f"Episode {ep:3d}: steps={steps}, total_reward={total_reward:.2f}, success={success}, avg_last100={running_rewards[-1]:.2f}")
+        print(
+            f"Episode {ep:3d}: steps={steps}, total_reward={total_reward:.2f}, success={success}, avg_last100={running_rewards[-1]:.2f}")
 
     if hasattr(agent, "finalize_training"):
         agent.finalize_training()
@@ -174,7 +203,7 @@ def main(args):
 
     os.makedirs(os.path.dirname(path_file), exist_ok=True)
     np.save(path_file, np.array(path))
-    print(f"Evaluation finished after {len(path)-1} steps — path saved as {path_file}")
+    print(f"Evaluation finished after {len(path) - 1} steps — path saved as {path_file}")
 
     os.makedirs(os.path.dirname(reward_file), exist_ok=True)
     df_metrics = pd.DataFrame(metrics)
@@ -227,18 +256,63 @@ def main(args):
         json.dump(log_dict, f, indent=2)
     print(f"Full training log saved as {log_file}")
 
-if __name__ == "__main__":
-    grid_arg = sys.argv[1] if len(sys.argv) > 1 else None
-    episodes = int(sys.argv[2]) if len(sys.argv) > 2 else 1000
-    max_steps = int(sys.argv[3]) if len(sys.argv) > 3 else 100
-    random_seed = int(sys.argv[4]) if len(sys.argv) > 4 else 42
-    agent_name = sys.argv[5] if len(sys.argv) > 5 else "dqn"
 
-    args = {
-        "grid_arg": grid_arg,
-        "episodes": episodes,
-        "max_steps": max_steps,
-        "random_seed": random_seed,
-        "agent": agent_name.lower()
-    }
+def parse_args():
+    p = argparse.ArgumentParser(
+        description="Train a random agent in a continuous environment with optional grid and GUI"
+    )
+    p.add_argument(
+        "--grid",
+        choices=["none", "wall", "table"],
+        default="none",
+        help="Which grid to load: none, wall, or table (default: none).",
+    )
+    p.add_argument(
+        "--agent",
+        choices=["random", "dqn", "ppo"],
+        default="dqn",
+        help="Select agent to train: random, DQN, ppo (default: dqn).",
+    )
+
+    p.add_argument(
+        "--episodes",
+        action="store",
+        default=1000,
+        help="Define number of episodes to train (default: 1000).",
+    )
+
+    p.add_argument(
+        "--max-steps",
+        action="store",
+        default=100,
+        help="Define maximum number of steps to train (default: 100).",
+    )
+
+    p.add_argument(
+        "--random-seed",
+        action="store",
+        default=42,
+        help="Define random seed (default: 42).",
+    )
+
+    p.add_argument(
+        "--no-gui",
+        action="store_true",
+        help="Run with or without GUI (default: True).",
+    )
+
+    return p.parse_args()
+
+
+"""
+ARGUMENTS
+--grid [none, wall, table]
+--agent [random, DQN, ppo]
+--episodes Integer
+--max-steps Integer
+--random-seed Integer
+--no-gui
+"""
+if __name__ == "__main__":
+    args = parse_args()
     main(args)
