@@ -17,7 +17,7 @@ from agents.random_agent import RandomAgent
 from world.cont_environment import Cont_Environment
 from world.cont_grid import Grid
 
-from world.path_visualizer import visualize_path  # <-- Use your own PIL grid/path visualizer
+from world.cont_path_visualizer import visualize_path_cont_env
 
 import math
 
@@ -225,16 +225,8 @@ def main(args):
     fig.write_image(reward_png)
     print(f"Saved Plotly reward curve as: {reward_png}")
 
-    # Save path using PIL visualize_path (not Plotly)
-    path_png = path_file.replace("/graph_path/", "/graphs/").replace(".npy", ".png")
-    initial_grid = getattr(env, "grid", None)
-    if initial_grid is not None:
-        pil_img = visualize_path(initial_grid, path)
-        pil_img.save(path_png)
-        print(f"Saved PIL path visualization as: {path_png}")
-    else:
-        path_png = None
-        print("Skipping path plot: env.grid not available.")
+    path_png = visualize_path_cont_env(env, path)
+    print(f"Saved PIL path visualization as: {path_png}")
 
     log_dict = {
         "agent": agent_name,
@@ -242,7 +234,7 @@ def main(args):
         "timestamp": timestamp,
         "episodes": episodes,
         "max_steps": max_steps,
-        "seed": args["random_seed"],
+        "seed": args.random_seed,
         "success_rate": float(np.mean(success_flags)),
         "avg_reward_last100": float(np.mean(episode_rewards[-100:])),
         "final_eval_steps": len(path) - 1,
@@ -276,6 +268,7 @@ def parse_args():
 
     p.add_argument(
         "--episodes",
+        type=int,
         action="store",
         default=1000,
         help="Define number of episodes to train (default: 1000).",
@@ -283,6 +276,7 @@ def parse_args():
 
     p.add_argument(
         "--max-steps",
+        type=int,
         action="store",
         default=100,
         help="Define maximum number of steps to train (default: 100).",

@@ -13,7 +13,7 @@ def visualize_path_cont_env(env, agent_path, save_dir="results", image_size=None
         image_size: size of the output image.
 
     Returns:
-        nothing
+        save_path: the path to the saved image.
     """
 
     # Create a new directory if not there yet and create filename
@@ -50,6 +50,21 @@ def visualize_path_cont_env(env, agent_path, save_dir="results", image_size=None
     draw.ellipse([target_px[0] - px_radius, target_px[1] - px_radius,
                   target_px[0] + px_radius, target_px[1] + px_radius],
                  fill=(0, 200, 0), outline=None)
+    
+    # Draw obstacles
+    if hasattr(env, "grid") and env.grid is not None:
+        grid = env.grid
+        obstacle_cells = grid.get_all_obstacle_cells()
+        for row, col in obstacle_cells:
+            x_min = grid.x_min + col * grid.cell_width
+            y_min = grid.y_min + row * grid.cell_height
+            x_max = x_min + grid.cell_width
+            y_max = y_min + grid.cell_height
+
+            top_left = world_to_pixel((x_min, y_max))
+            bottom_right = world_to_pixel((x_max, y_min))
+            draw.rectangle([top_left, bottom_right], fill=(100, 100, 100))
 
     # Save image
     img.save(save_path)
+    return save_path

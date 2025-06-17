@@ -77,7 +77,7 @@ class Cont_Environment:
         self.agent_start_pos = agent_start_pos
         self.terminal_state = False
         self.state_dim  = 3   # because reset() returns (x,y,phi) # If you change the number of features also change this
-        self.action_dim = 4   # because step() accepts 0,1,2,3 only # If you change the number of actions also change this
+        self.action_dim = 3   # because step() accepts 0,1,2,3 only # If you change the number of actions also change this
 
         # Initialize environment if a grid was provided
         if grid is not None:
