@@ -380,11 +380,11 @@ class Cont_Environment:
         if self.out_of_bounds(new_pos):
             reward = -10
         elif np.linalg.norm(np.array(new_pos[:2]) - self.target_pos) <= self.target_radius:
-            reward = 10
+            reward = 100
             self.terminal_state = True
             self.info["target_reached"] = True
         else:
-            reward = -0.1
+            reward = -1
 
         return reward
     

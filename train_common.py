@@ -50,7 +50,7 @@ def get_agent_config(agent_name, state_dim, action_dim, args):
             state_dim=state_dim,
             action_dim=action_dim,
             gamma=0.99,
-            lr=3e-4,
+            lr=1e-4,
             clip_epsilon=0.1,
             update_epochs=10,
             batch_size=64,
@@ -130,7 +130,7 @@ def main(args):
     reward_file = get_filename("results_common/rewards/reward", agent_name, agent_cfg, timestamp, "csv")
     log_file = get_filename("results_common/logs/log", agent_name, agent_cfg, timestamp, "json")
     path_file = get_filename("results_common/graph_path/path", agent_name, agent_cfg, timestamp, "npy")
-
+    update_every = 2
     for ep in range(1, episodes + 1):
         state = env.reset()
         total_reward = 0.0
@@ -146,7 +146,7 @@ def main(args):
                 action, logprob = agent.select_action(state)
                 next_state, reward, done, info, _ = env.step(action)
                 timeout = (t == max_steps) and (not done)
-                agent.store_transition(state, action, logprob, reward, done or timeout)
+                agent.store_transition(state, action, logprob, reward, done)
             else:
                 action = agent.take_action(state)
                 next_state, reward, done, info, _ = env.step(action)
@@ -166,7 +166,9 @@ def main(args):
                 break
 
         if agent_name == "ppo":
-            agent.learn()
+            if ep % update_every == 0:
+                agent.learn()
+
 
         if agent_name == "dqn" and hasattr(agent, "target_update") and ep % agent.target_update == 0:
             agent.target_net.load_state_dict(agent.policy_net.state_dict())
@@ -270,16 +272,16 @@ def parse_args():
         "--episodes",
         type=int,
         action="store",
-        default=1000,
-        help="Define number of episodes to train (default: 1000).",
+        default=2000,
+        help="Define number of episodes to train (default: 2000).",
     )
 
     p.add_argument(
         "--max-steps",
         type=int,
         action="store",
-        default=100,
-        help="Define maximum number of steps to train (default: 100).",
+        default=10000,
+        help="Define maximum number of steps to train (default: 10000).",
     )
 
     p.add_argument(

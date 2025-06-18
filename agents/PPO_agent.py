@@ -127,6 +127,8 @@ class PPOAgent(BaseAgent):
         returns = [adv + val for adv, val in zip(advantages, values)]
         advantages = torch.FloatTensor(advantages).to(self.device)
         returns = torch.FloatTensor(returns).to(self.device)
+        advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-8) #normalize advantages
+
 
         for _ in range(self.update_epochs):
             idx = np.arange(len(states))
@@ -154,7 +156,7 @@ class PPOAgent(BaseAgent):
                 actor_loss = -torch.min(surr1, surr2).mean()
                 # critic loss is mse between critic values and returns
                 critic_loss = nn.MSELoss()(self.critic(batch_states).squeeze(-1), batch_returns)
-                loss = actor_loss + 0.5 * critic_loss - 0.01 * entropy
+                loss = actor_loss + 0.5 * critic_loss - 0.03 * entropy
 
                 self.optimizer.zero_grad()
                 loss.backward()
