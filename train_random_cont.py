@@ -9,7 +9,7 @@ from world.cont_grid import Grid
 def main(grid_arg: str| None, no_gui: bool):
     """
     If grid_arg == "None", pass grid=None into Cont_Environment.
-    Otherwise, we attempt to load the grid from either from wall_grid.py or table_grid.py.
+    Otherwise, we attempt to load the grid from either from wall_grid.py or table_grid_easy.py.
     """
     if grid_arg is None or grid_arg.lower() == "none":
         grid = None
@@ -27,18 +27,18 @@ def main(grid_arg: str| None, no_gui: bool):
         world_size = (4.0, 4.0)
         grid = Grid(raw_cells, world_size, "wall_grid")
         print("→ Loaded grid from wall_grid.py.")
-    elif grid_arg.lower() == "table":
+    elif grid_arg.lower() == "table_easy":
         try:
-            from world.table_grid import load_grid
+            from world.table_grid_easy import load_grid
         except ImportError:
             raise RuntimeError(
-                "Could not find world/table_grid.py or load_grid() inside it."
+                "Could not find world/table_grid_easy.py or load_grid() inside it."
             )
         # load_grid() should return a 2D numpy array of ints
         raw_cells, starting_pos = load_grid()
         world_size = (4.0, 4.0)
-        grid = Grid(raw_cells, world_size, "table_grid")
-        print("→ Loaded grid from table_grid.py.")
+        grid = Grid(raw_cells, world_size, "table_grid_easy")
+        print("→ Loaded grid from table_grid_easy.py.")
 
     env = Cont_Environment(
         no_gui=no_gui,

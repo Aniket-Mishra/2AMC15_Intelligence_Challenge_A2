@@ -90,18 +90,18 @@ def main(args):
         world_size = (4.0, 4.0)
         grid = Grid(raw_cells, world_size, "wall_grid")
         print("Loaded grid from wall_grid.py.")
-    elif args.grid == "table":
+    elif args.grid == "table_easy":
         try:
-            from world.table_grid import load_grid
+            from world.table_grid_easy import load_grid
         except ImportError:
             raise RuntimeError(
-                "Could not find world/table_grid.py or load_grid() inside it."
+                "Could not find world/table_grid_easy.py or load_grid() inside it."
             )
         # load_grid() should return a 2D numpy array of ints
         raw_cells, starting_pos = load_grid()
         world_size = (4.0, 4.0)
-        grid = Grid(raw_cells, world_size, "table_grid")
-        print("Loaded grid from table_grid.py.")
+        grid = Grid(raw_cells, world_size, "table_grid_easy")
+        print("Loaded grid from table_grid_easy.py.")
     else:
         raise ValueError(f"Unknown grid type: {args.grid}")
 
@@ -255,7 +255,7 @@ def parse_args():
     )
     p.add_argument(
         "--grid",
-        choices=["none", "wall", "table"],
+        choices=["none", "wall", "table_easy"],
         default="none",
         help="Which grid to load: none, wall, or table (default: none).",
     )
@@ -300,7 +300,7 @@ def parse_args():
 
 """
 ARGUMENTS
---grid [none, wall, table]
+--grid [none, wall, table_easy]
 --agent [random, DQN, ppo]
 --episodes Integer
 --max-steps Integer

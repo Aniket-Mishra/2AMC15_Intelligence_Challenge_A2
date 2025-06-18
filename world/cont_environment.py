@@ -91,14 +91,14 @@ class Cont_Environment:
                 self.target_pos = np.array([1.25, 1.25])
                 self.target_radius = self.forward_speed * 1.5
 
-            elif grid.get_name() == "table_grid":
-                print("Table grid successfuly loaded")
+            elif grid.get_name() == "table_grid_easy":
+                print("Table grid Easy successfuly loaded")
                 self.grid = grid
                 # Override x_bounds, y_bounds to match the world_size used by the Grid:
                 self.x_bounds = [grid.x_min, grid.x_min + grid.world_width]
                 self.y_bounds = [grid.y_min, grid.y_min + grid.world_height]
 
-                self.target_pos = np.array([0.75, 0.75])
+                self.target_pos = np.array([1.75, 1.25])
                 self.target_radius = self.forward_speed * 2
 
             else:

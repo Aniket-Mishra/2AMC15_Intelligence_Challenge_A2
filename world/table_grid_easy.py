@@ -5,7 +5,7 @@ import numpy as np
 from numpy import ndarray, dtype
 
 
-def load_grid() -> tuple[ndarray[Any, dtype[Any]], tuple[int, float, float]]:
+def load_grid() -> tuple[ndarray[Any, dtype[Any]], tuple[float, float, float]]:
     """
     Returns a 2D numpy array of integers, where:
       0 = empty cell
@@ -26,12 +26,13 @@ def load_grid() -> tuple[ndarray[Any, dtype[Any]], tuple[int, float, float]]:
     grid[0, 7] = 1
     grid[2, 7] = 1
     grid[0, 5] = 1
+    grid[0, 3] = 1
 
-    grid[7, 7] = 1
-    grid[7, 5] = 1
-    grid[5, 7] = 1
-    grid[5, 5] = 1
+    grid[6, 7] = 1
+    grid[4, 7] = 1
+    grid[6, 3] = 1
+    grid[4, 3] = 1
 
-    starting_position = (0, -1.5, 0.0)
+    starting_position = (-0.75, -0.75, 0.0)
 
     return grid, starting_position
