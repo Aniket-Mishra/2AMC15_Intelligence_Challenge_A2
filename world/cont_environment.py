@@ -288,26 +288,17 @@ class Cont_Environment:
             is_single_step = False
 
         self.world_stats["total_steps"] += 1
-
-        # Add stochasticity into the agent action
-        # TODO: Implement later? (not sure if we even want this at all)
-        #val = random.random()
-        #if val > self.sigma:
-        #    actual_action = action
-        #else:
-        #    actual_action = random.randint(0, 3)
-        actual_action = action
         
         # Make the move
-        self.info["actual_action"] = actual_action
+        self.info["actual_action"] = action
 
-        if actual_action == 0: # Move forward in direction specified by phi
+        if action == 0: # Move forward in direction specified by phi
             new_pos = (self.agent_pos[0] + self.forward_speed*np.cos(self.agent_pos[2]), # x + fwd_speed*cos(phi)
                        self.agent_pos[1] + self.forward_speed*np.sin(self.agent_pos[2]), # y + fwd_speed*sin(phi)
                        self.agent_pos[2])                                                # phi (unchanged)
-        elif actual_action == 1: # Rotate left by rotation_speed radians
+        elif action == 1: # Rotate left by rotation_speed radians
             new_pos = (self.agent_pos[0], self.agent_pos[1], (self.agent_pos[2] + self.rotation_speed) % (2*np.pi))
-        elif actual_action == 2: # Rotate right by rotation_speed radians
+        elif action == 2: # Rotate right by rotation_speed radians
             new_pos = (self.agent_pos[0], self.agent_pos[1], (self.agent_pos[2] - self.rotation_speed) % (2*np.pi))
         else: # Stop (do nothing) - useless for now, but this will be replaced with a "decelerate" action later.
             new_pos = self.agent_pos
@@ -390,7 +381,7 @@ class Cont_Environment:
         if self.out_of_bounds(new_pos):
             reward = -10
         elif np.linalg.norm(np.array(new_pos[:2]) - self.target_pos) <= self.target_radius:
-            reward = 100
+            reward = 300
             self.terminal_state = True
             self.info["target_reached"] = True
         else:

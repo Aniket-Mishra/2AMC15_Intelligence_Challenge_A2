@@ -224,6 +224,3 @@ class DQNAgent(BaseAgent):
         self.epsilon_start = 0.0
         self.epsilon_end = 0.0
         self.steps_done = self.epsilon_decay
-
-    def update(self, state, reward, action):
-        pass

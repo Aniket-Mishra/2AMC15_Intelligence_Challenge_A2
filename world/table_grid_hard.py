@@ -13,7 +13,7 @@ def load_grid() -> tuple[ndarray[Any, dtype[Any]], tuple[float, float, float]]:
       2 = target
 
     Just an example config, to make a more granular grid just increase the grid size below. A new obstacle or target
-     is created by assigning cell values a corresponding number.
+      is created by assigning cell values a corresponding number.
     """
     grid = np.zeros((8, 8), dtype=int)
 
@@ -29,11 +29,14 @@ def load_grid() -> tuple[ndarray[Any, dtype[Any]], tuple[float, float, float]]:
 
     grid[6, 7] = 1
     grid[4, 7] = 1
-    grid[6, 5] = 1
-    grid[4, 5] = 1
     grid[6, 3] = 1
-    grid[4, 3] = 1
+    grid[4, 5] = 1
 
-    starting_position = (-0.75, -0.75, 0.0)
+    grid[6, 5] = 1 # New tables in hard, not present in easy
+    grid[4, 3] = 1
+    #grid[2, 5] = 1 # Slightly harder version 
+    #grid[2, 3] = 1 # Slightly harder version
+
+    starting_position = (-1.0, -1.0, 0.0)
 
     return grid, starting_position

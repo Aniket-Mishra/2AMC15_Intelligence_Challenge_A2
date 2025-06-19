@@ -240,8 +240,8 @@ def main(args):
         template="plotly_white",
         width=900, height=400
     )
-    fig.write_image(reward_png)
-    print(f"Saved Plotly reward curve as: {reward_png}")
+    #fig.write_image(reward_png)
+    #print(f"Saved Plotly reward curve as: {reward_png}")
 
     path_png = visualize_path_cont_env(env, path)
     print(f"Saved PIL path visualization as: {path_png}")

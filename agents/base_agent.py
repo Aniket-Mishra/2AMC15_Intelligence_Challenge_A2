@@ -23,15 +23,3 @@ class BaseAgent(ABC):
             state: The updated position of the agent.
         """
         raise NotImplementedError
-    
-    @abstractmethod
-    def update(self, state: tuple[float, float, float], reward: float, action: int):
-        """Any code that processes a reward given the state and updates the agent.
-
-        Args:
-            state: The updated position of the agent.
-            reward: The value which is returned by the environment as a
-                reward.
-            action: The action which was taken by the agent.
-        """
-        raise NotImplementedError
