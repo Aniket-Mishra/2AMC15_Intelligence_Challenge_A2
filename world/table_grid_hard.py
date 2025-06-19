@@ -29,6 +29,8 @@ def load_grid() -> tuple[ndarray[Any, dtype[Any]], tuple[float, float, float]]:
 
     grid[6, 7] = 1
     grid[4, 7] = 1
+    grid[6, 5] = 1
+    grid[4, 5] = 1
     grid[6, 3] = 1
     grid[4, 3] = 1
 

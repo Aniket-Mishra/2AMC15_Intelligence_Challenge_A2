@@ -28,13 +28,15 @@ AGENT_CLASSES = {
 }
 
 
-#TODO I removed most of the values for DQN and PPO from args, because thats too many args to pass. We can add these to a config file instead
 def get_agent_config(agent_name, state_dim, action_dim, args):
+    with open("agent_config.json", "r") as f:
+        config = json.load(f)
     if agent_name == "dqn":
-        EPS_START = 1.0
-        EPS_END = 0.01
-        r = 0.01
-        ratio = 0.3
+        parameters = config["DQN"]
+        EPS_START = parameters["eps_start"]
+        EPS_END = parameters["eps_end"]
+        r = parameters["r"]
+        ratio = parameters["ratio"]
         total_steps = args.episodes * args.max_steps
         t_target = int(ratio * total_steps)
         epsilon_decay = int(-t_target / math.log(r))
@@ -46,15 +48,16 @@ def get_agent_config(agent_name, state_dim, action_dim, args):
             epsilon_decay=epsilon_decay
         )
     elif agent_name == "ppo":
+        parameters = config["PPO"]
         return dict(
             state_dim=state_dim,
             action_dim=action_dim,
-            gamma=0.99,
-            lr=1e-4,
-            clip_epsilon=0.1,
-            update_epochs=10,
-            batch_size=64,
-            gae_lambda=0.95
+            gamma=parameters["gamma"],
+            lr=parameters["lr"],
+            clip_epsilon=parameters["clip_epsilon"],
+            update_epochs=parameters["update_epochs"],
+            batch_size=parameters["batch_size"],
+            gae_lambda=parameters["gae_lambda"],
         )
     elif agent_name == "random":
         return {}
@@ -102,6 +105,18 @@ def main(args):
         world_size = (4.0, 4.0)
         grid = Grid(raw_cells, world_size, "table_grid_easy")
         print("Loaded grid from table_grid_easy.py.")
+    elif args.grid == "table_hard":
+        try:
+            from world.table_grid_hard import load_grid
+        except ImportError:
+            raise RuntimeError(
+                "Could not find world/table_grid_hard.py or load_grid() inside it."
+            )
+        # load_grid() should return a 2D numpy array of ints
+        raw_cells, starting_pos = load_grid()
+        world_size = (4.0, 4.0)
+        grid = Grid(raw_cells, world_size, "table_grid_hard")
+        print("Loaded grid from table_grid_hard.py.")
     else:
         raise ValueError(f"Unknown grid type: {args.grid}")
 
@@ -115,6 +130,7 @@ def main(args):
         raise ValueError(f"Unknown agent '{agent_name}'. Available: {list(AGENT_CLASSES)}")
 
     agent_cfg = get_agent_config(agent_name, state_dim, action_dim, args)
+    print(agent_cfg)
     agent = AgentClass(**agent_cfg) if agent_cfg else AgentClass()
 
     episodes = args.episodes
@@ -257,7 +273,7 @@ def parse_args():
     )
     p.add_argument(
         "--grid",
-        choices=["none", "wall", "table_easy"],
+        choices=["none", "wall", "table_easy", "table_hard"],
         default="none",
         help="Which grid to load: none, wall, or table (default: none).",
     )
@@ -302,7 +318,7 @@ def parse_args():
 
 """
 ARGUMENTS
---grid [none, wall, table_easy]
+--grid [none, wall, table_easy, table_hard]
 --agent [random, DQN, ppo]
 --episodes Integer
 --max-steps Integer

@@ -1,39 +1,16 @@
 {
-  "DQL": {
-    "module": "agents.dql_agent",
-    "class": "DeepQLearningAgent",
-    "init_args": {
-
-      "num_actions": [
-
-      ]
-    },
-    "train_mode": "deeeeeeeep"
+  "PPO": {
+    "gamma": 0.99,
+    "lr": 1e-4,
+    "clip_epsilon": 0.1,
+    "update_epochs": 10,
+    "batch_size": 64,
+    "gae_lambda": 0.95
   },
-  "RandomAgent": {
-    "module": "agents.random_agent",
-    "class": "RandomAgent",
-    "init_args": {
-    },
-    "train_mode": "iterative"
-  },
-  "OtherAgent1": {
-    "module": "agents.other_agent1",
-    "class": "OtherAgent1",
-    "init_args": {
-
-      "action_space": [
-
-      ]
-    },
-    "train_mode": "deeeeeepeeeerrrrr"
-  },
-  "OtherAgent2": {
-    "module": "agents.other_agent2",
-    "class": "OtherAgent2",
-    "init_args": {
-
-    },
-    "train_mode": "MUCHdeeeeeepeeeerrrrr"
+  "DQN": {
+    "eps_start": 1.0,
+    "eps_end": 0.01,
+    "r": 0.01,
+    "ratio": 0.3
   }
 }
