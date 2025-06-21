@@ -42,6 +42,7 @@ class Cont_Environment:
                  grid: Grid = None,
                  no_gui: bool = False,
                  #sigma: float = 0.,
+                 rotation_penalty: float = 0.1,
                  agent_start_pos: tuple[float, float, float] = None, # Start pos is defined by (x,y,phi) coordinates
                  reward_fn: callable = None,
                  #target_fps: int = 30,
@@ -72,6 +73,7 @@ class Cont_Environment:
                 is provided, then the seed will be set to 0.
         """
         self.grid = grid
+        self.rotation_penalty = rotation_penalty
         self.forward_speed = forward_speed
         self.rotation_speed = rotation_speed
         self.agent_start_pos = agent_start_pos
@@ -386,6 +388,9 @@ class Cont_Environment:
             self.info["target_reached"] = True
         else:
             reward = -1
+
+        if self.info.get("actual_action") in (1, 2):
+            reward -= self.rotation_penalty
 
         return reward
     
