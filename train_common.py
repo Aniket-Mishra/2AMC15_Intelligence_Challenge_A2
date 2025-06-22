@@ -154,6 +154,10 @@ def main(args):
         done = False
         success = 0
 
+        # start a fresh per‐episode buffer in DQN
+        if agent_name == "dqn":
+            agent.start_episode()
+
         if agent_name == "ppo":
             agent.memory.clear()
 
@@ -167,13 +171,17 @@ def main(args):
                 action = agent.take_action(state)
                 next_state, reward, done, info, _ = env.step(action)
                 timeout = (t == max_steps) and (not done)
-                if hasattr(agent, "store_transition"):
-                    if agent_name == "random":
-                        pass
-                    else:
-                        agent.store_transition(state, action, reward, next_state, done or timeout)
-                if hasattr(agent, "learn"):
+
+                if agent_name == "dqn":
+                    # record into the per‐episode buffer and learn off successful episodes
+                    agent.record_transition(state, action, reward, next_state, done or timeout)
                     agent.learn()
+                else:
+                    if hasattr(agent, "store_transition") and agent_name != "random":
+                        agent.store_transition(state, action, reward, next_state, done or timeout)
+                    if hasattr(agent, "learn"):
+                        agent.learn()
+
             state = next_state
             total_reward += reward
             steps = t
@@ -185,9 +193,9 @@ def main(args):
             if ep % update_every == 0:
                 agent.learn()
 
-
-        if agent_name == "dqn" and hasattr(agent, "target_update") and ep % agent.target_update == 0:
-            agent.target_net.load_state_dict(agent.policy_net.state_dict())
+        # only for DQN: now that episode is done, push it into the main buffer if it succeeded
+        if agent_name == "dqn":
+            agent.end_episode(success)
 
         episode_rewards.append(total_reward)
         episode_lengths.append(steps)

@@ -11,6 +11,6 @@
     "eps_start": 1.0,
     "eps_end": 0.01,
     "r": 0.01,
-    "ratio": 0.3
+    "ratio": 0.5
   }
 }

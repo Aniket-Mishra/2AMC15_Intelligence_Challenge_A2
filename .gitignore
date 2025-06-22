@@ -239,3 +239,5 @@ venv.bak/
 .mypy_cache/
 
 /results
+
+/results_common
