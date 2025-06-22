@@ -9,6 +9,7 @@ from pathlib import Path
 
 import pandas as pd
 import plotly.graph_objects as go
+import kaleido
 
 from agents.DQN_agent import DQNAgent
 from agents.PPO_agent import PPOAgent
@@ -26,6 +27,8 @@ AGENT_CLASSES = {
     "ppo": PPOAgent,
     "random": RandomAgent,
 }
+
+ROLLING_AVG = 50 # Nr of past episodes to take the rolling average reward over
 
 
 def get_agent_config(agent_name, state_dim, action_dim, args):
@@ -69,6 +72,10 @@ def get_filename(prefix, agent_name, agent_config, timestamp, extension):
     cfg_str = "_".join(f"{k}{v}" for k, v in agent_config.items())
     return f"{prefix}_{agent_name}_{cfg_str}_{timestamp}.{extension}"
 
+# Wouter's new filename for use with plots_new.
+# Once this has been fully integrated, clean up the old get_filename
+def get_filename_new(prefix, environment, agent, no_episodes, no_steps, lr, target_reward):
+    return f'{prefix}/METRICS_env={environment}_agent={agent}_episodes={no_episodes}_steps={no_steps}_lr={lr}_targetreward={target_reward}.csv'
 
 def main(args):
     print(args)
@@ -143,7 +150,9 @@ def main(args):
     running_rewards = []
 
     timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-    reward_file = get_filename("results_common/rewards/reward", agent_name, agent_cfg, timestamp, "csv")
+    #reward_file = get_filename("results_common/rewards/reward", agent_name, agent_cfg, timestamp, "csv") # OLD
+    reward_file = get_filename_new("results_common/rewards", args.grid, args.agent, args.episodes, args.max_steps, 1e-3, 300) # NEW
+    # ^ TODO: extract target reward and lr from args instead
     log_file = get_filename("results_common/logs/log", agent_name, agent_cfg, timestamp, "json")
     path_file = get_filename("results_common/graph_path/path", agent_name, agent_cfg, timestamp, "npy")
     update_every = 2
@@ -200,18 +209,18 @@ def main(args):
         episode_rewards.append(total_reward)
         episode_lengths.append(steps)
         success_flags.append(success)
-        running_rewards.append(np.mean(episode_rewards[-100:]))
+        running_rewards.append(np.mean(episode_rewards[-ROLLING_AVG:]))
 
         metrics.append({
             "episode": ep,
             "reward": total_reward,
             "length": steps,
             "success": success,
-            "avg_last_100": running_rewards[-1]
+            f"avg_last_{ROLLING_AVG}": running_rewards[-1]
         })
 
         print(
-            f"Episode {ep:3d}: steps={steps}, total_reward={total_reward:.2f}, success={success}, avg_last100={running_rewards[-1]:.2f}")
+            f"Episode {ep:3d}: steps={steps}, total_reward={total_reward:.2f}, success={success}, avg_last_{ROLLING_AVG}={running_rewards[-1]:.2f}")
 
     if hasattr(agent, "finalize_training"):
         agent.finalize_training()
@@ -239,7 +248,7 @@ def main(args):
     reward_png = reward_file.replace("/rewards/", "/graphs/").replace(".csv", ".png")
     fig = go.Figure()
     fig.add_trace(go.Scatter(y=df_metrics['reward'], mode='lines', name='Reward per Episode'))
-    fig.add_trace(go.Scatter(y=df_metrics['avg_last_100'], mode='lines', name='Avg Last 100'))
+    fig.add_trace(go.Scatter(y=df_metrics[f'avg_last_{ROLLING_AVG}'], mode='lines', name=f'Avg Last {ROLLING_AVG}'))
     fig.update_layout(
         title=f"Episode Rewards - {agent_name.upper()}",
         xaxis_title="Episode",
@@ -248,8 +257,8 @@ def main(args):
         template="plotly_white",
         width=900, height=400
     )
-    #fig.write_image(reward_png)
-    #print(f"Saved Plotly reward curve as: {reward_png}")
+    fig.write_image(reward_png)
+    print(f"Saved Plotly reward curve as: {reward_png}")
 
     path_png = visualize_path_cont_env(env, path)
     print(f"Saved PIL path visualization as: {path_png}")
@@ -262,7 +271,7 @@ def main(args):
         "max_steps": max_steps,
         "seed": args.random_seed,
         "success_rate": float(np.mean(success_flags)),
-        "avg_reward_last100": float(np.mean(episode_rewards[-100:])),
+        f"avg_reward_last_{ROLLING_AVG}": float(np.mean(episode_rewards[-ROLLING_AVG:])),
         "final_eval_steps": len(path) - 1,
         "reward_file": reward_file,
         "path_file": path_file,
