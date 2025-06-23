@@ -1,0 +1,16 @@
+{
+  "ppo": {
+    "gamma": [0.95, 0.99],
+    "clip_epsilon": [0.1],
+    "update_epochs": [5],
+    "batch_size": [32],
+    "gae_lambda": [0.9]
+  },
+
+  "dqn": {
+    "eps_start": [1.0],
+    "eps_end": [0.01],
+    "r": [0.01, 0.001],
+    "ratio": [0.5]
+  }
+}
