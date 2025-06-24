@@ -3,7 +3,7 @@ import numpy as np
 import os
 from datetime import datetime
 
-def visualize_path_cont_env(env, agent_path, save_dir="results", image_size=None):
+def visualize_path_cont_env(env, agent_path, filename, save_dir="results",  image_size=None):
     """Creates and saves an image of the path the agent took.
 
     Args:
@@ -27,7 +27,8 @@ def visualize_path_cont_env(env, agent_path, save_dir="results", image_size=None
             image_size = (902, 768)
 
     timestamp = datetime.now().strftime("%Y-%m-%d__%H-%M-%S")
-    save_path = os.path.join(save_dir, f"{timestamp}.png")
+    #save_path = os.path.join(save_dir, f"{timestamp}.png") # Timestamp ver
+    save_path = os.path.join(save_dir, filename)  # Parameters in filename ver
 
     width, height = image_size
     img = Image.new("RGB", image_size, color=(255, 255, 255))

@@ -41,45 +41,32 @@ class Cont_Environment:
                  rotation_speed: float = np.pi/6,
                  grid: Grid = None,
                  no_gui: bool = False,
-                 #sigma: float = 0.,
-                 rotation_penalty: float = 0.1,
                  agent_start_pos: tuple[float, float, float] = None, # Start pos is defined by (x,y,phi) coordinates
-                 reward_fn: callable = None,
-                 #target_fps: int = 30,
+                 rotation_penalty: float = 0.1,
+                 target_reward = 300,
                  random_seed: int | float | str | bytes | bytearray | None = 0):
         
-        """Creates the Continuous Environment for the Reinforcement Learning robot.
-        For now, the implementation is very basic; the world is empty save for the agent and the boundaries.
-
-        OLD DESCRIPTION:
-        This environment follows the general principles of reinforcment
-        learning. It can be thought of as a function E : action -> observation
-        where E is the environment represented as a function.
-
+        """
+        Creates the Continuous Environment for the Reinforcement Learning robot.
+        
         Args:
-            grid_fp: Path to the grid file to use. <- UNUSED; once we have obstacles figured out, replace with a path to the obstacle file (whatever format that may be in)
-            no_gui: True if no GUI is desired.
-            sigma: The stochasticity of the environment. The probability that
-                the agent makes the move that it has provided as an action is
-                calculated as 1-sigma. <- UNUSED
-            agent_start_pos: Tuple where each agent should start.
-                If None is provided, then a random start position is used.
-            reward_fn: Custom reward function to use.  <- UNUSED until target is implemented
-            target_fps: How fast the simulation should run if it is being shown
-                in a GUI. If in no_gui mode, then the simulation will run as fast as
-                possible. We may set a low FPS so we can actually see what's
-                happening. Set to 0 or less to unlock FPS. <- UNUSED until GUI is done
-            random_seed: The random seed to use for this environment. If None
-                is provided, then the seed will be set to 0.
+        - forward_speed: distance that the robot moves forward in a "move forward" action.
+        - rotation_angle: angle that the robot rotates by in a "rotate left" or "rotate right" action.
+        - grid: obstacle layout for the environment.
+        - no_gui: whether to show the gui or not.
+        - rotation_penalty: reward penalty for when the robot takes a rotate action. A higher value discourages rotation vs moving forward.
+        - target_reward: reward for reaching the target. A higher value makes the robot focus more on exploitation vs exploration.
+        - random_seed: seed for initializing random number generation.
         """
         self.grid = grid
-        self.rotation_penalty = rotation_penalty
         self.forward_speed = forward_speed
         self.rotation_speed = rotation_speed
         self.agent_start_pos = agent_start_pos
         self.terminal_state = False
+        self.rotation_penalty = rotation_penalty
+        self.target_reward = target_reward
         self.state_dim  = 3   # because reset() returns (x,y,phi) # If you change the number of features also change this
-        self.action_dim = 3   # because step() accepts 0,1,2,3 only # If you change the number of actions also change this
+        self.action_dim = 3   # because step() accepts 0,1,2 only # If you change the number of actions also change this
 
         # Initialize environment if a grid was provided
         if grid is not None:
@@ -116,7 +103,7 @@ class Cont_Environment:
             else:
                 raise ValueError("Grid name not found")
 
-        # Otherwise if None, create a 4x4 world and create a target at a uniformly random place within the grid
+        # Otherwise if None, create an empty 4x4 world and create a target at a uniformly random place within the grid
         else:
             self.x_bounds = [-2,2]
             self.y_bounds = [-2,2]
@@ -124,14 +111,7 @@ class Cont_Environment:
             # Target and target radius
             self.target_pos = np.array([random.uniform(self.x_bounds[0], self.x_bounds[1]),
                                         random.uniform(self.y_bounds[0], self.y_bounds[1])])
-            self.target_radius = self.forward_speed * 2    # Size of the target. 1.5 times the step size so that it cannot overshoot
-              
-        # Set up reward function
-        if reward_fn is None:
-            warn("No reward function provided. Using default reward.")
-            self.reward_fn = self._default_reward_function
-        else:
-            self.reward_fn = reward_fn
+            self.target_radius = self.forward_speed * 2    # Size of the target. 2 times the step size so that it cannot overshoot
 
         # GUI specific code: Set up the environment as a blank state.
         self.no_gui = no_gui
@@ -175,10 +155,9 @@ class Cont_Environment:
         """Initializes agent position and rotation from the given location.
         If none is provided, places the agent at (0,0) with a random rotation.
         """
-
         if self.agent_start_pos is not None:
             pos = (self.agent_start_pos[0], self.agent_start_pos[1], self.agent_start_pos[2])
-            # TODO: Check if this position is not inside an obstacle or inside target region
+            # ^ Note: this does not check if this position is not inside an obstacle or inside target region!
 
             # Check if position is not out of bounds
             if self.out_of_bounds(pos):
@@ -189,7 +168,6 @@ class Cont_Environment:
         else:
             # No position given. We place agent at (0,0).
             warn("No initial agent positions provided. Placing agent at (0,0) with a random rotation.")
-            # TODO: make this a random location not inside an obstacle?
             self.agent_pos = (0,0, np.random.uniform(0, 2*np.pi))
 
 
@@ -221,7 +199,6 @@ class Cont_Environment:
                                      f"keyword arguments.")
         
         # Reset variables
-        #self.grid = Grid.load_grid(self.grid_fp).cells # TODO: reload environment layout file
         self._initialize_agent_pos()
         self.terminal_state = False
         self.info = self._reset_info()
@@ -244,7 +221,7 @@ class Cont_Environment:
             self.info["agent_moved"] = False
             pass
         # Check if the new position is in the target region
-        # TODO
+        # ^ This is done inside the step() function
         # Otherwise, moved to an empty tile
         else:
             self.agent_pos = new_pos
@@ -259,18 +236,16 @@ class Cont_Environment:
             - 0: Move forward
             - 1: Rotate left
             - 2: Rotate right
-            - 3: Stop (do nothing)
         Args:
-            action: Integer representing the action the agent should
-                take. 
+            action: Integer representing the action the agent should take. 
 
         Returns:
             0) Current state,
             1) The reward for the agent,
-            2) If the terminal state has been reached (currently unused since there is no target)
+            2) If the terminal state has been reached
         """
 
-        # GUI specific code
+        ### GUI specific code ###
         if self.gui is not None:
             #If we are paused AND the user has NOT pressed the right-arrow or next step button, just redraw
             if self.gui.paused and not self.gui.step_requested:
@@ -288,12 +263,14 @@ class Cont_Environment:
         else:
             # GUI is disabled so no pause/single-step logic
             is_single_step = False
+        ##########################
 
         self.world_stats["total_steps"] += 1
         
         # Make the move
         self.info["actual_action"] = action
 
+        # Determine how to move the agent
         if action == 0: # Move forward in direction specified by phi
             new_pos = (self.agent_pos[0] + self.forward_speed*np.cos(self.agent_pos[2]), # x + fwd_speed*cos(phi)
                        self.agent_pos[1] + self.forward_speed*np.sin(self.agent_pos[2]), # y + fwd_speed*sin(phi)
@@ -302,7 +279,7 @@ class Cont_Environment:
             new_pos = (self.agent_pos[0], self.agent_pos[1], (self.agent_pos[2] + self.rotation_speed) % (2*np.pi))
         elif action == 2: # Rotate right by rotation_speed radians
             new_pos = (self.agent_pos[0], self.agent_pos[1], (self.agent_pos[2] - self.rotation_speed) % (2*np.pi))
-        else: # Stop (do nothing) - useless for now, but this will be replaced with a "decelerate" action later.
+        else: # Invalid action; do nothing
             new_pos = self.agent_pos
 
         # out‐of‐bounds: stay, big penalty, terminate
@@ -349,9 +326,9 @@ class Cont_Environment:
                 return self.agent_pos, reward, self.terminal_state, self.info, self.world_stats
 
         # Calculate the reward for the agent
-        # TODO; for now reward is always -1
-        reward = self.reward_fn(self, new_pos)
+        reward = self._default_reward_function(self, action, new_pos)
 
+        # Actually move the agent
         self._move_agent(new_pos)
         
         self.world_stats["cumulative_reward"] += reward
@@ -363,19 +340,16 @@ class Cont_Environment:
         return self.agent_pos, reward, self.terminal_state, self.info, self.world_stats
 
     @staticmethod
-    def _default_reward_function(self, new_pos) -> float:
+    def _default_reward_function(self, action, new_pos) -> float:
         """Simple reward function for initial testing.
-        The reward should be:
-        - Slightly negative for taking a safe step (to encourage finding the shortest path)
-        - Strongly negative for running into an obstacle
+        The reward is:
+        - Slightly negative for taking a safe step (to encourage finding the shortest path),
+          with an additional penalty for rotation (we want the robot to not waste time turning unnecessarily)
+        - Strongly negative for running into an obstacle or the environment bounds
         - Very strongly positive for reaching the target region.
-
-        Currently target and obstacles are not implemented, so the reward is an arbitrary -0.1 for taking a safe step
-        and -10 for running into a wall (values subject ot change later).
 
         Args:
             new_pos: The position the agent is moving to.
-            Add more arguments here as needed (once target and obstacles are implemented)
 
         Returns:
             A single floating point value representing the reward for a given action.
@@ -389,7 +363,7 @@ class Cont_Environment:
         else:
             reward = -1
 
-        if self.info.get("actual_action") in (1, 2):
+        if action in [1, 2]:
             reward -= self.rotation_penalty
 
         return reward
@@ -402,7 +376,6 @@ class Cont_Environment:
     def evaluate_agent(#grid_fp: Path,
                        agent: BaseAgent,
                        max_steps: int,
-                       #sigma: float = 0.,
                        agent_start_pos: tuple[int, int] = None,
                        random_seed: int | float | str | bytes | bytearray = 0,
                        show_images: bool = False):

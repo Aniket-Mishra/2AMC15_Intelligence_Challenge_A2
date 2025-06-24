@@ -6,6 +6,7 @@ import torch
 import datetime
 import json
 from pathlib import Path
+from tqdm import tqdm
 
 import pandas as pd
 import plotly.graph_objects as go
@@ -29,13 +30,16 @@ AGENT_CLASSES = {
 }
 
 ROLLING_AVG = 50 # Nr of past episodes to take the rolling average reward over
-
+CONVERGENCE_THRESHOLD = 0.95 # The agent is said to have converged when the rolling average of its last ROLLING_AVG rewards 
+                             # first gets above CONVERGENCE_THRESHOLD * the highest reward earned over the course of training.
 
 def get_agent_config(agent_name, state_dim, action_dim, args):
+    '''Read in config file with agent parameters'''
     with open("agent_config.json", "r") as f:
         config = json.load(f)
     if agent_name == "dqn":
         parameters = config["DQN"]
+        #lr = parameters["lr"] # lr is now taken from arguments (TODO: remove this line)
         EPS_START = parameters["eps_start"]
         EPS_END = parameters["eps_end"]
         r = parameters["r"]
@@ -46,6 +50,7 @@ def get_agent_config(agent_name, state_dim, action_dim, args):
         return dict(
             state_dim=state_dim,
             action_dim=action_dim,
+            #lr=lr,
             epsilon_start=EPS_START,
             epsilon_end=EPS_END,
             epsilon_decay=epsilon_decay
@@ -56,7 +61,7 @@ def get_agent_config(agent_name, state_dim, action_dim, args):
             state_dim=state_dim,
             action_dim=action_dim,
             gamma=parameters["gamma"],
-            lr=parameters["lr"],
+            #lr=parameters["lr"], # lr is now taken from arguments (TODO: remove this line)
             clip_epsilon=parameters["clip_epsilon"],
             update_epochs=parameters["update_epochs"],
             batch_size=parameters["batch_size"],
@@ -74,16 +79,19 @@ def get_filename(prefix, agent_name, agent_config, timestamp, extension):
 
 # Wouter's new filename for use with plots_new.
 # Once this has been fully integrated, clean up the old get_filename
-def get_filename_new(prefix, environment, agent, no_episodes, no_steps, lr, target_reward):
-    return f'{prefix}/METRICS_env={environment}_agent={agent}_episodes={no_episodes}_steps={no_steps}_lr={lr}_targetreward={target_reward}.csv'
+def get_filename_new(folder, type, environment, agent, no_episodes, no_steps, lr, target_reward, extension):
+    return f'{folder}/{type}_env={environment}_agent={agent}_episodes={no_episodes}_steps={no_steps}_lr={lr}_targetreward={target_reward}.{extension}'
 
 def main(args):
-    print(args)
+    print("Provided args: ", args)
+    args.lr = float(args.lr)
+    # Initialize directories for saving log files
     Path("results_common/logs").mkdir(parents=True, exist_ok=True)
     Path("results_common/graph_path").mkdir(parents=True, exist_ok=True)
     Path("results_common/rewards").mkdir(parents=True, exist_ok=True)
     Path("results_common/graphs").mkdir(parents=True, exist_ok=True)
 
+    ### STEP 1: INITIALIZE GRID ###
     if args.grid is None or args.grid == "none":
         grid = None
         starting_pos = (0, 0, 0.0)
@@ -127,19 +135,27 @@ def main(args):
     else:
         raise ValueError(f"Unknown grid type: {args.grid}")
 
-    env = Cont_Environment(no_gui=args.no_gui, grid=grid, random_seed=args.random_seed, agent_start_pos=starting_pos)
+    env = Cont_Environment(no_gui=args.no_gui, 
+                           grid=grid, 
+                           random_seed=args.random_seed, 
+                           agent_start_pos=starting_pos, 
+                           target_reward=args.target_reward)
     state_dim = env.state_dim
     action_dim = env.action_dim
 
+    ### STEP 2: SET UP AGENT ###
     agent_name = args.agent
     AgentClass = AGENT_CLASSES.get(agent_name)
     if AgentClass is None:
         raise ValueError(f"Unknown agent '{agent_name}'. Available: {list(AGENT_CLASSES)}")
 
     agent_cfg = get_agent_config(agent_name, state_dim, action_dim, args)
-    print(agent_cfg)
+    agent_cfg['lr'] = args.lr # Add lr from args
+    print("Agent config: ", agent_cfg)
     agent = AgentClass(**agent_cfg) if agent_cfg else AgentClass()
+    #print("TEST: ", agent.optimizer.param_groups[0]['lr'], env.target_reward) # See if lr and target reward were set correctly
 
+    ### STEP 3: SET UP TRAINING PROCEDURE & TRACKERS ###
     episodes = args.episodes
     max_steps = args.max_steps
 
@@ -151,32 +167,35 @@ def main(args):
 
     timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
     #reward_file = get_filename("results_common/rewards/reward", agent_name, agent_cfg, timestamp, "csv") # OLD
-    reward_file = get_filename_new("results_common/rewards", args.grid, args.agent, args.episodes, args.max_steps, 1e-3, 300) # NEW
-    # ^ TODO: extract target reward and lr from args instead
-    log_file = get_filename("results_common/logs/log", agent_name, agent_cfg, timestamp, "json")
-    path_file = get_filename("results_common/graph_path/path", agent_name, agent_cfg, timestamp, "npy")
-    update_every = 2
-    for ep in range(1, episodes + 1):
+    reward_file = get_filename_new("results_common/rewards", "METRICS", args.grid, args.agent, args.episodes, args.max_steps, args.lr, args.target_reward, 'csv') # NEW
+    log_file = get_filename_new("results_common/logs", "LOG", args.grid, args.agent, args.episodes, args.max_steps, args.lr, args.target_reward, 'json') # NEW
+    path_file = get_filename_new("results_common/graph_path", "GRAPH", args.grid, args.agent, args.episodes, args.max_steps, args.lr, args.target_reward, 'npy') # NEW
+    visualization_file = get_filename_new("", "PATH", args.grid, args.agent, args.episodes, args.max_steps, args.lr, args.target_reward, 'png') # NEW
+    visualization_file = visualization_file[1:] # get rid of / at the start
+
+    update_every = 2 # PPO only learns every update_every episodes
+    # Actually run training
+    for ep in tqdm(range(1, episodes + 1)):
         state = env.reset()
         total_reward = 0.0
         steps = 0
         done = False
         success = 0
 
-        # start a fresh per‐episode buffer in DQN
+        # start a fresh per‐episode buffer
         if agent_name == "dqn":
             agent.start_episode()
-
         if agent_name == "ppo":
             agent.memory.clear()
 
+        # Simulate 1 episode
         for t in range(1, max_steps + 1):
-            if agent_name == "ppo":
+            if agent_name == "ppo":  # PPO
                 action, logprob = agent.select_action(state)
                 next_state, reward, done, info, _ = env.step(action)
                 timeout = (t == max_steps) and (not done)
                 agent.store_transition(state, action, logprob, reward, done)
-            else:
+            else:  # DQN/Random
                 action = agent.take_action(state)
                 next_state, reward, done, info, _ = env.step(action)
                 timeout = (t == max_steps) and (not done)
@@ -219,12 +238,20 @@ def main(args):
             f"avg_last_{ROLLING_AVG}": running_rewards[-1]
         })
 
-        print(
-            f"Episode {ep:3d}: steps={steps}, total_reward={total_reward:.2f}, success={success}, avg_last_{ROLLING_AVG}={running_rewards[-1]:.2f}")
+        if(not args.no_print):
+            print(f"Episode {ep:3d}: steps={steps}, total_reward={total_reward:.2f}, success={success}, avg_last_{ROLLING_AVG}={running_rewards[-1]:.2f}")
 
     if hasattr(agent, "finalize_training"):
         agent.finalize_training()
 
+    # Calculate in which episode the agent converged
+    avg_rewards = [ep_stats[f'avg_last_{ROLLING_AVG}'] for ep_stats in metrics][ROLLING_AVG:] # Ignore first episodes due to instability 
+    max_reward = max(avg_rewards)
+    rewards_converged = avg_rewards > CONVERGENCE_THRESHOLD * max_reward # True at index i iff the reward for episode i is > CONVERGENCE_THRESHOLD * max_reward
+    convergence_episode = list(rewards_converged).index(True) if True in rewards_converged else len(rewards_converged) # First episode where the rewards converged
+    convergence_episode += ROLLING_AVG # To account for the fact that we removed the first ROLLING_AVG episodes
+
+    ### STEP 4: EVALUATE AGENT ###
     state = env.reset()
     path = [state]
     done = False
@@ -240,11 +267,14 @@ def main(args):
     np.save(path_file, np.array(path))
     print(f"Evaluation finished after {len(path) - 1} steps — path saved as {path_file}")
 
+    # Save log of rewards earned
     os.makedirs(os.path.dirname(reward_file), exist_ok=True)
     df_metrics = pd.DataFrame(metrics)
     df_metrics.to_csv(reward_file, index=False)
     print(f"Reward/metrics log saved as {reward_file}")
 
+    # Make plot of rewards earned this run
+    # NOTE: No longer used, we now use plots_new.py which plots multiple runs in a single figure
     reward_png = reward_file.replace("/rewards/", "/graphs/").replace(".csv", ".png")
     fig = go.Figure()
     fig.add_trace(go.Scatter(y=df_metrics['reward'], mode='lines', name='Reward per Episode'))
@@ -257,12 +287,15 @@ def main(args):
         template="plotly_white",
         width=900, height=400
     )
-    fig.write_image(reward_png)
-    print(f"Saved Plotly reward curve as: {reward_png}")
+    # Unused
+    #fig.write_image(reward_png)
+    #print(f"Saved Plotly reward curve as: {reward_png}")
 
-    path_png = visualize_path_cont_env(env, path)
+    # Save image visualizing the path the agent took
+    path_png = visualize_path_cont_env(env, path, filename=visualization_file)
     print(f"Saved PIL path visualization as: {path_png}")
 
+    # Save log of config used for this run and where the saved logs/images can be found
     log_dict = {
         "agent": agent_name,
         "agent_config": agent_cfg,
@@ -276,7 +309,9 @@ def main(args):
         "reward_file": reward_file,
         "path_file": path_file,
         "reward_plot_png": reward_png,
-        "path_plot_png": path_png
+        "path_plot_png": path_png,
+        "EVALUATION STEPS": len(path),
+        "CONVERGENCE EPISODE": convergence_episode
     }
     os.makedirs(os.path.dirname(log_file), exist_ok=True)
     with open(log_file, "w") as f:
@@ -305,7 +340,7 @@ def parse_args():
         "--episodes",
         type=int,
         action="store",
-        default=2000,
+        default=1000,
         help="Define number of episodes to train (default: 2000).",
     )
 
@@ -313,7 +348,7 @@ def parse_args():
         "--max-steps",
         type=int,
         action="store",
-        default=10000,
+        default=500,
         help="Define maximum number of steps to train (default: 10000).",
     )
 
@@ -325,9 +360,29 @@ def parse_args():
     )
 
     p.add_argument(
+        "--target-reward",
+        action="store",
+        default=300,
+        help="Reward received for reaching the target."
+    )
+
+    p.add_argument(
+        "--lr",
+        action="store",
+        default=1e-3,
+        help="Learning rate for the agent."
+    )
+
+    p.add_argument(
         "--no-gui",
         action="store_true",
-        help="Run with or without GUI (default: True).",
+        help="Run without GUI (default: False)."
+    )
+
+    p.add_argument(
+        "--no-print",
+        action="store_true",
+        help="Run without printing the summary of each episode (default: False)."
     )
 
     return p.parse_args()
