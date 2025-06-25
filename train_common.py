@@ -1,5 +1,4 @@
 import argparse
-import sys
 import os
 import numpy as np
 import torch
@@ -7,20 +6,14 @@ import datetime
 import json
 from pathlib import Path
 from tqdm import tqdm
-
 import pandas as pd
 import plotly.graph_objects as go
-import kaleido
-
 from agents.DQN_agent import DQNAgent
 from agents.PPO_agent import PPOAgent
 from agents.random_agent import RandomAgent
-
 from world.cont_environment import Cont_Environment
 from world.cont_grid import Grid
-
 from world.cont_path_visualizer import visualize_path_cont_env
-
 import math
 
 AGENT_CLASSES = {
@@ -39,7 +32,6 @@ def get_agent_config(agent_name, state_dim, action_dim, args):
         config = json.load(f)
     if agent_name == "dqn":
         parameters = config["DQN"]
-        #lr = parameters["lr"] # lr is now taken from arguments (TODO: remove this line)
         EPS_START = parameters["eps_start"]
         EPS_END = parameters["eps_end"]
         r = parameters["r"]
@@ -50,7 +42,6 @@ def get_agent_config(agent_name, state_dim, action_dim, args):
         return dict(
             state_dim=state_dim,
             action_dim=action_dim,
-            #lr=lr,
             epsilon_start=EPS_START,
             epsilon_end=EPS_END,
             epsilon_decay=epsilon_decay
@@ -61,7 +52,6 @@ def get_agent_config(agent_name, state_dim, action_dim, args):
             state_dim=state_dim,
             action_dim=action_dim,
             gamma=parameters["gamma"],
-            #lr=parameters["lr"], # lr is now taken from arguments (TODO: remove this line)
             clip_epsilon=parameters["clip_epsilon"],
             update_epochs=parameters["update_epochs"],
             batch_size=parameters["batch_size"],
@@ -150,7 +140,8 @@ def main(args):
         raise ValueError(f"Unknown agent '{agent_name}'. Available: {list(AGENT_CLASSES)}")
 
     agent_cfg = get_agent_config(agent_name, state_dim, action_dim, args)
-    agent_cfg['lr'] = args.lr # Add lr from args
+    if agent_cfg != {}:
+        agent_cfg['lr'] = args.lr # Add lr from args
     print("Agent config: ", agent_cfg)
     agent = AgentClass(**agent_cfg) if agent_cfg else AgentClass()
     #print("TEST: ", agent.optimizer.param_groups[0]['lr'], env.target_reward) # See if lr and target reward were set correctly
@@ -394,8 +385,11 @@ ARGUMENTS
 --agent [random, DQN, ppo]
 --episodes Integer
 --max-steps Integer
+--target-reward Integer
 --random-seed Integer
+--lr Integer
 --no-gui
+--no-print
 """
 if __name__ == "__main__":
     args = parse_args()

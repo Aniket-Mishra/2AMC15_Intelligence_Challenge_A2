@@ -1,108 +1,54 @@
+# Data Intelligence Challenge 2025 - Group 10
+The following information contains instructions on how to replicate the results found in the associated report of group 10, as well as a short description of the algorithms and environment used for this reinforcement learning task.
+## Environment and Agents
+Our RL task consists of a robot navigating a restaurant to deliver food to customers. The robot is capable of three actions: Move forward, Rotate right, Rotate left. To simulate a restaurant environment, obstacles in the form of tables have been added to the grid representing the restaurant. There are two possible grids, one easy (`table_grid_easy`) and one more difficult (`table_grid_hard`). There are two possible RL algorithms to choose from for the robot, DQN (Deep Q-Network) or PPO (Proximal Policy Optimization), with the possibility to also initialize a random agent which makes random moves.
+### DQN
+DQN extends the tabular Q-learning algorithm from Assignment 1 to continuous state
+spaces and discrete action sets.
+Rather than storing a lookup table of Q-values, we approximate the action-value function
+by a neural network, implemented as a 3-layer MLP of which 2 layers have 128 neurons
+each. It takes the 3 state features and outputs one scalar Q-value per action.
+### PPO
+Proximal Policy Optimization (PPO) is a policy gradient method that optimizes a stochastic policy directly, providing stability and efficiency through a clipped objective. PPO is
+suitable for both discrete and continuous action spaces, making it ideal for navigation tasks
+with unknown or changing goals.
+PPO improves classic policy gradients by constraining the policy update with a clipped
+objective to avoid large, destabilizing updates.
+## Files
+`../agents` - contains all agent files
 
-Welcome to Data Intelligence Challenge-2AMC15!
-This is the repository containing the challenge environment code.
+`../world` - contains all files related to the environment. `cont_environment.py` contains logic for step taking of agents, collision detection, GUI updates.
 
-## Quickstart
+`../results`, `../results_common` - stores the results including graphs as found in the report
 
-1. Create a virtual environment for this course with Python >= 3.10. Using conda, you can do: `conda create -n dic2025 python=3.11`. Use `conda activate dic2025` to activate it `conda deactivate` to deactivate it.
-2. Clone this repository into the local directory you prefer `git clone https://github.com/DataIntelligenceChallenge/2AMC15-2025.git`.
-3. Install the required packages `pip install -r requirements.txt`. Now, you are ready to use the simulation environment! :partying_face:	
-4. Run `$ python train.py grid_configs/example_grid.npy` to start training!
+`train_DQN.py`, `train_ppo.py`, `train_random_cont.py` - legacy training files, obsolete as of latest implementation
 
-`train.py` is just an example training script. Inside this file, initialize the agent you want to train and evaluate. Feel free to modify it as necessary. Its usage is:
+`train_common.py` - Script to train a single agent on a specified grid with provided arguments
 
-```bash
-usage: train.py [-h] [--no_gui] [--sigma SIGMA] [--fps FPS] [--iter ITER]
-                [--random_seed RANDOM_SEED] 
-                GRID [GRID ...]
+`cont_run_experiments.py` - Runs the predefined experiments as outlined in the report
 
-DIC Reinforcement Learning Trainer.
-
-positional arguments:
-  GRID                  Paths to the grid file to use. There can be more than
-                        one.
-options:
-  -h, --help                 show this help message and exit
-  --no_gui                   Disables rendering to train faster (boolean)
-  --sigma SIGMA              Sigma value for the stochasticity of the environment. (float, default=0.1, should be in [0, 1])
-  --fps FPS                  Frames per second to render at. Only used if no_gui is not set. (int, default=30)
-  --iter ITER                Number of iterations to go through. Should be integer. (int, default=1000)
-  --random_seed RANDOM_SEED  Random seed value for the environment. (int, default=0)
+`agent_config.json`, `agent_config_multiple.json` - stores the configuration of agents, with the latter file storing multiple values to run multiple agents
+## Usage
+### Training individual agents
+Using the `train_common.py` file it is possible to train individual agents. To change the parameters of the desired agent use the `agent_config.json` file. Only certain parameters are found in this file, other parameters that are passed as arguments in the command line are listed below:
 ```
-
-## Code guide
-
-The code is made up of 2 modules: 
-
-1. `agent`
-2. `world`
-
-### The `agent` module
-
-The `agent` module contains the `BaseAgent` class as well as some benchmark agents you may want to test against.
-
-The `BaseAgent` is an abstract class and all RL agents for DIC must inherit from/implement it.
-If you know/understand class inheritence, skip the following section:
-
-#### `BaseAgent` as an abstract class
-Here you can find an explanation about abstract classes [Geeks for Geeks](https://www.geeksforgeeks.org/abstract-classes-in-python/).
-
-Think of this like how all models in PyTorch start like 
-
-```python
-class NewModel(nn.Module):
-    def __init__(self):
-        super().__init__()
-    ...
+--grid [none, wall, table_easy, table_hard] - "Which grid to load: none, wall, or table (default: none)."
+--agent [random, DQN, ppo] - "Select agent to train: random, DQN, ppo (default: dqn)."
+--episodes (Integer) - "Define number of episodes to train (default: 2000)."
+--max-steps (Integer) - "Define maximum number of steps to train (default: 10000)."
+--target-reward (Integer) - "Reward received for reaching the target."
+--random-seed (Integer) - "Define random seed (default: 42)."
+--lr (Integer) - "Learning rate for the agent."
+--no-gui - "Run without GUI (default: False)."
+--no-print - "Run without printing the summary of each episode (default: False)."
 ```
+Example runs
 
-In this case, `NewModel` inherits from `nn.Module`, which gives it the ability to do back propagation, store parameters, etc. without you having to manually code that every time.
-It also ensures that every class that inherits from `nn.Module` contains _at least_ the `forward()` method, which allows a forward pass to actually happen.
+`python train_common.py --agent dqn --grid table_easy`
 
-In the case of your RL agent, inheriting from `BaseAgent` guarantees that your agent implements `update()` and `take_action()`.
-This ensures that no matter what RL agent you make and however you code it, the environment and training code can always interact with it in the same way.
-Check out the benchmark agents to see examples.
+`python train_common.py --agent ppo --grid table_hard --episodes 500 --no-gui`
 
-### The `world` module
+### Running the experiments found in the report
+By running the `cont_run_experiments.py` file, it is possible to get the same results as shown in the report. This file runs 6 separate experiments with differing parameters and grids.
 
-The world module contains:
-1. `grid_creator.py`
-2. `environment.py`
-3. `grid.py`
-4. `gui.py`
-
-#### Grid creator
-Run this file to create new grids.
-
-```bash
-$ python grid_creator.py
-```
-
-This will start up a web server where you create new grids, of different sizes with various elements arrangements.
-To view the grid creator itself, go to `127.0.0.1:5000`.
-All levels will be saved to the `grid_configs/` directory.
-
-
-#### The Environment
-
-The `Environment` is very important because it contains everything we hold dear, including ourselves [^1].
-It is also the name of the class which our RL agent will act within. Most of the action happens in there.
-
-The main interaction with `Environment` is through the methods:
-
-- `Environment()` to initialize the environment
-- `reset()` to reset the environment
-- `step()` to actually take a time step with the environment
-- `Environment().evaluate_agent()` to evaluate the agent after training.
-
-[^1]: In case you missed it, this sentence is a joke. Please do not write all your code in the `Environment` class.
-
-#### The Grid
-
-The `Grid` class is the the actual representation of the world on which the agent moves. It is a 2D Numpy array.
-
-#### The GUI
-
-The Graphical User Interface provides a way for you to actually see what the RL agent is doing.
-While performant and written using PyGame, it is still about 1300x slower than not running a GUI.
-Because of this, we recommend using it only while testing/debugging and not while training.
+`python cont_run_experiments.py`

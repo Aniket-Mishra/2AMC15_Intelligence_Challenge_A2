@@ -2,21 +2,15 @@
 Environment.
 """
 import random
-import datetime
 import numpy as np
 from tqdm import trange
-from pathlib import Path
 from warnings import warn
-from time import time, sleep
-from datetime import datetime
-from world.helpers import save_results, action_to_direction
 from world.cont_path_visualizer import visualize_path_cont_env
 
 try:
     from agents import BaseAgent
     from world.cont_gui import GUI
     from world.cont_grid import Grid
-    from world.path_visualizer import visualize_path
 except ModuleNotFoundError:
     from os import path
     from os import pardir
@@ -30,8 +24,6 @@ except ModuleNotFoundError:
         sys.path.append(root_path)
 
     from agents import BaseAgent
-    from world.gui import GUI
-    from world.path_visualizer import visualize_path
 
 
 
