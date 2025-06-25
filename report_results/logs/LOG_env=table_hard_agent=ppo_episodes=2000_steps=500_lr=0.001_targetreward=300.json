@@ -1,0 +1,26 @@
+{
+  "agent": "ppo",
+  "agent_config": {
+    "state_dim": 3,
+    "action_dim": 3,
+    "gamma": 0.99,
+    "clip_epsilon": 0.1,
+    "update_epochs": 10,
+    "batch_size": 64,
+    "gae_lambda": 0.95,
+    "lr": 0.001
+  },
+  "timestamp": "20250624_153356",
+  "episodes": 2000,
+  "max_steps": 500,
+  "seed": 42,
+  "success_rate": 0.955,
+  "avg_reward_last_50": 206.45999999999995,
+  "final_eval_steps": 41,
+  "reward_file": "results_common/rewards/METRICS_env=table_hard_agent=ppo_episodes=2000_steps=500_lr=0.001_targetreward=300.csv",
+  "path_file": "results_common/graph_path/GRAPH_env=table_hard_agent=ppo_episodes=2000_steps=500_lr=0.001_targetreward=300.npy",
+  "reward_plot_png": "results_common/graphs/METRICS_env=table_hard_agent=ppo_episodes=2000_steps=500_lr=0.001_targetreward=300.png",
+  "path_plot_png": "results\\PATH_env=table_hard_agent=ppo_episodes=2000_steps=500_lr=0.001_targetreward=300.png",
+  "EVALUATION STEPS": 42,
+  "CONVERGENCE EPISODE": 1697
+}

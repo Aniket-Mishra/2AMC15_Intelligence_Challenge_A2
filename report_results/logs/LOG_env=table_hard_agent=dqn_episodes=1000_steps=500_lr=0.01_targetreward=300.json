@@ -1,0 +1,24 @@
+{
+  "agent": "dqn",
+  "agent_config": {
+    "state_dim": 3,
+    "action_dim": 3,
+    "epsilon_start": 1.0,
+    "epsilon_end": 0.01,
+    "epsilon_decay": 54286,
+    "lr": 0.01
+  },
+  "timestamp": "20250624_030429",
+  "episodes": 1000,
+  "max_steps": 500,
+  "seed": 42,
+  "success_rate": 0.909,
+  "avg_reward_last_50": 206.46200000000016,
+  "final_eval_steps": 22,
+  "reward_file": "results_common/rewards/METRICS_env=table_hard_agent=dqn_episodes=1000_steps=500_lr=0.01_targetreward=300.csv",
+  "path_file": "results_common/graph_path/GRAPH_env=table_hard_agent=dqn_episodes=1000_steps=500_lr=0.01_targetreward=300.npy",
+  "reward_plot_png": "results_common/graphs/METRICS_env=table_hard_agent=dqn_episodes=1000_steps=500_lr=0.01_targetreward=300.png",
+  "path_plot_png": "results\\PATH_env=table_hard_agent=dqn_episodes=1000_steps=500_lr=0.01_targetreward=300.png",
+  "EVALUATION STEPS": 23,
+  "CONVERGENCE EPISODE": 333
+}
