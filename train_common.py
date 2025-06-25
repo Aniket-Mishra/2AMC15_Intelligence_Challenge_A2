@@ -62,13 +62,7 @@ def get_agent_config(agent_name, state_dim, action_dim, args):
     else:
         raise ValueError(f"Unknown agent type: {agent_name}")
 
-
-def get_filename(prefix, agent_name, agent_config, timestamp, extension):
-    cfg_str = "_".join(f"{k}{v}" for k, v in agent_config.items())
-    return f"{prefix}_{agent_name}_{cfg_str}_{timestamp}.{extension}"
-
-# Wouter's new filename for use with plots_new.
-# Once this has been fully integrated, clean up the old get_filename
+# Produce a filename to save an image/logfile to
 def get_filename_new(folder, type, environment, agent, no_episodes, no_steps, lr, target_reward, extension):
     return f'{folder}/{type}_env={environment}_agent={agent}_episodes={no_episodes}_steps={no_steps}_lr={lr}_targetreward={target_reward}.{extension}'
 
@@ -156,8 +150,8 @@ def main(args):
     success_flags = []
     running_rewards = []
 
+    # Filenames for where to save the logs
     timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-    #reward_file = get_filename("results_common/rewards/reward", agent_name, agent_cfg, timestamp, "csv") # OLD
     reward_file = get_filename_new("results_common/rewards", "METRICS", args.grid, args.agent, args.episodes, args.max_steps, args.lr, args.target_reward, 'csv') # NEW
     log_file = get_filename_new("results_common/logs", "LOG", args.grid, args.agent, args.episodes, args.max_steps, args.lr, args.target_reward, 'json') # NEW
     path_file = get_filename_new("results_common/graph_path", "GRAPH", args.grid, args.agent, args.episodes, args.max_steps, args.lr, args.target_reward, 'npy') # NEW
@@ -266,19 +260,18 @@ def main(args):
 
     # Make plot of rewards earned this run
     # NOTE: No longer used, we now use plots_new.py which plots multiple runs in a single figure
-    reward_png = reward_file.replace("/rewards/", "/graphs/").replace(".csv", ".png")
-    fig = go.Figure()
-    fig.add_trace(go.Scatter(y=df_metrics['reward'], mode='lines', name='Reward per Episode'))
-    fig.add_trace(go.Scatter(y=df_metrics[f'avg_last_{ROLLING_AVG}'], mode='lines', name=f'Avg Last {ROLLING_AVG}'))
-    fig.update_layout(
-        title=f"Episode Rewards - {agent_name.upper()}",
-        xaxis_title="Episode",
-        yaxis_title="Reward",
-        legend=dict(orientation="h", yanchor="bottom", y=-0.3, xanchor="center", x=0.5),
-        template="plotly_white",
-        width=900, height=400
-    )
-    # Unused
+    #reward_png = reward_file.replace("/rewards/", "/graphs/").replace(".csv", ".png")
+    #fig = go.Figure()
+    #fig.add_trace(go.Scatter(y=df_metrics['reward'], mode='lines', name='Reward per Episode'))
+    #fig.add_trace(go.Scatter(y=df_metrics[f'avg_last_{ROLLING_AVG}'], mode='lines', name=f'Avg Last {ROLLING_AVG}'))
+    #fig.update_layout(
+    #    title=f"Episode Rewards - {agent_name.upper()}",
+    #    xaxis_title="Episode",
+    #    yaxis_title="Reward",
+    #    legend=dict(orientation="h", yanchor="bottom", y=-0.3, xanchor="center", x=0.5),
+    #    template="plotly_white",
+    #    width=900, height=400
+    #)
     #fig.write_image(reward_png)
     #print(f"Saved Plotly reward curve as: {reward_png}")
 
@@ -299,7 +292,7 @@ def main(args):
         "final_eval_steps": len(path) - 1,
         "reward_file": reward_file,
         "path_file": path_file,
-        "reward_plot_png": reward_png,
+        #"reward_plot_png": reward_png, # Deprecated
         "path_plot_png": path_png,
         "EVALUATION STEPS": len(path),
         "CONVERGENCE EPISODE": convergence_episode
@@ -312,19 +305,21 @@ def main(args):
 
 def parse_args():
     p = argparse.ArgumentParser(
-        description="Train a random agent in a continuous environment with optional grid and GUI"
+        description="Train a deep reinforcement learning agent in a continuous environment with optional grid and GUI"
     )
+
     p.add_argument(
         "--grid",
         choices=["none", "wall", "table_easy", "table_hard"],
-        default="none",
-        help="Which grid to load: none, wall, or table (default: none).",
+        default="table_easy",
+        help="Which grid to load: none, wall, table_easy or table_hard (default: table_easy).",
     )
+
     p.add_argument(
         "--agent",
         choices=["random", "dqn", "ppo"],
         default="dqn",
-        help="Select agent to train: random, DQN, ppo (default: dqn).",
+        help="Which agent to train: random, dqn or ppo (default: dqn).",
     )
 
     p.add_argument(
@@ -332,7 +327,7 @@ def parse_args():
         type=int,
         action="store",
         default=1000,
-        help="Define number of episodes to train (default: 2000).",
+        help="Number of episodes to train for (default: 1000).",
     )
 
     p.add_argument(
@@ -340,14 +335,14 @@ def parse_args():
         type=int,
         action="store",
         default=500,
-        help="Define maximum number of steps to train (default: 10000).",
+        help="(Max) number of steps per episode (default: 500).",
     )
 
     p.add_argument(
         "--random-seed",
         action="store",
         default=42,
-        help="Define random seed (default: 42).",
+        help="Random seed to use the same initialization for different agents (default: 42).",
     )
 
     p.add_argument(
@@ -361,7 +356,7 @@ def parse_args():
         "--lr",
         action="store",
         default=1e-3,
-        help="Learning rate for the agent."
+        help="Learning rate of the agent."
     )
 
     p.add_argument(

@@ -7,6 +7,7 @@ import torch.optim as optim
 from agents import BaseAgent
 
 class QNetwork(nn.Module):
+    '''A 3-layer MLP to approximate the Q function.'''
     def __init__(self, input_dim: int, output_dim: int):
         super().__init__()
         self.layers = nn.Sequential(
@@ -21,20 +22,22 @@ class QNetwork(nn.Module):
         return self.layers(x)
 
 class DQNAgent(BaseAgent):
+    '''The main class for the DQN agent.'''
     def __init__(
         self,
-        state_dim: int,
-        action_dim: int,
-        buffer_capacity: int = 10000,
-        batch_size: int = 256,
-        gamma: float = 0.99,
-        lr: float = 1e-3,
-        target_update: int = 500,
-        epsilon_start: float = 1.0,
-        epsilon_end: float = 0.01,
-        epsilon_decay: int = 250_000,
-        success_frac: float = 0.5  # fraction of each batch drawn from successful episodes
+        state_dim: int = 3,           # Dimension of a state; currently states are described as (x, y, phi), so state_dim = 3
+        action_dim: int = 3,          # Dimension of the action space; currently the robot can take 3 different actions, so action_dim = 3.
+        buffer_capacity: int = 10000, # How many transitions are stored in the replay buffer
+        batch_size: int = 256,        # Training batches will contain this many steps.
+        gamma: float = 0.99,          # Discount factor for the return.
+        lr: float = 1e-3,             # Optimizer learning rate.
+        target_update: int = 500,     # How many steps between each update of the target network.
+        epsilon_start: float = 1.0,   # The exploration probability epsilon decays from epsilon_start
+        epsilon_end: float = 0.01,    # to epsilon_end
+        epsilon_decay: int = 250_000, # across epsilon_decay steps.
+        success_frac: float = 0.5     # Fraction of each training batch that is drawn only from successful episodes.
     ):
+        # Initialize policy and target nets
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.policy_net = QNetwork(state_dim, action_dim).to(self.device)
         self.target_net = QNetwork(state_dim, action_dim).to(self.device)
@@ -42,8 +45,8 @@ class DQNAgent(BaseAgent):
         self.target_net.eval()
         self.optimizer = optim.Adam(self.policy_net.parameters(), lr=lr)
 
-        # two separate buffers
-        self.success_replay = []  # (state, action, reward, next_state, done, ep_length)
+        # Use separate replay buffers for succesful episodes (reached the target) and failed ones
+        self.success_replay = []  # Format: (state, action, reward, next_state, done, ep_length)
         self.fail_replay    = []  # same format
         self.current_episode = []
 
@@ -63,6 +66,8 @@ class DQNAgent(BaseAgent):
         self.current_episode.clear()
 
     def select_action(self, state: np.ndarray) -> int:
+        '''Select a random action with probability eps, 
+        or the best action according to the policy net otherwise.'''
         eps = self.epsilon_end + (self.epsilon_start - self.epsilon_end) * \
               np.exp(-1.0 * self.steps_done / self.epsilon_decay)
         self.steps_done += 1
@@ -77,7 +82,7 @@ class DQNAgent(BaseAgent):
         return self.select_action(np.array(state, dtype=np.float32))
 
     def record_transition(self, state, action, reward, next_state, done: bool):
-        """Buffer into current episode."""
+        """Save the given transition in the buffer for the current episode."""
         self.current_episode.append((state, action, reward, next_state, done))
 
     def end_episode(self, success: bool):
@@ -124,6 +129,7 @@ class DQNAgent(BaseAgent):
             idxs = np.random.choice(avail_fail, n_fail, replace=replace_fail)
             fail_batch = [self.fail_replay[i] for i in idxs]
 
+        # 3) put samples together into a batch
         batch = success_batch + fail_batch
         random.shuffle(batch)
 
@@ -134,15 +140,18 @@ class DQNAgent(BaseAgent):
         next_states_t = torch.FloatTensor(next_states).to(self.device)
         dones_t = torch.FloatTensor(dones).unsqueeze(1).to(self.device)
 
+        # 4) calculated predicted and target q
         current_q = self.policy_net(states_t).gather(1, actions_t)
         next_q = self.target_net(next_states_t).max(dim=1, keepdim=True)[0].detach()
         target_q = rewards_t + (1.0 - dones_t) * self.gamma * next_q
 
+        # 5) compute loss & do backprop
         loss = nn.functional.mse_loss(current_q, target_q)
         self.optimizer.zero_grad()
         loss.backward()
         self.optimizer.step()
 
+        # Copy policy net to target net every target_update steps
         if self.steps_done % self.target_update == 0:
             self.target_net.load_state_dict(self.policy_net.state_dict())
 

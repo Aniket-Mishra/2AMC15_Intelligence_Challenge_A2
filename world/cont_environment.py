@@ -276,7 +276,7 @@ class Cont_Environment:
 
         # out‐of‐bounds: stay, big penalty, terminate
         if self.out_of_bounds(new_pos):
-            reward = -10 #SET LOW
+            reward = -10 
             self.terminal_state = False
             self.world_stats["total_failed_moves"] += 1
             self.info["agent_moved"] = False
@@ -296,8 +296,7 @@ class Cont_Environment:
         # Obstacle collision check
         if self.grid is not None:
             if self.grid.is_obstacle(new_pos[0], new_pos[1]):
-                # Apply the same penalty as “out-of-bounds”
-                reward = -10
+                reward = -10 # Apply the same penalty as out-of-bounds (for now, could be different)
 
                 self.world_stats["total_failed_moves"] += 1
                 self.info["agent_moved"] = False
@@ -318,7 +317,7 @@ class Cont_Environment:
                 return self.agent_pos, reward, self.terminal_state, self.info, self.world_stats
 
         # Calculate the reward for the agent
-        reward = self._default_reward_function(self, action, new_pos)
+        reward = self.reward_function(self, action, new_pos)
 
         # Actually move the agent
         self._move_agent(new_pos)
@@ -332,9 +331,8 @@ class Cont_Environment:
         return self.agent_pos, reward, self.terminal_state, self.info, self.world_stats
 
     @staticmethod
-    def _default_reward_function(self, action, new_pos) -> float:
-        """Simple reward function for initial testing.
-        The reward is:
+    def reward_function(self, action, new_pos) -> float:
+        """Simple reward function. The reward is:
         - Slightly negative for taking a safe step (to encourage finding the shortest path),
           with an additional penalty for rotation (we want the robot to not waste time turning unnecessarily)
         - Strongly negative for running into an obstacle or the environment bounds
@@ -363,69 +361,3 @@ class Cont_Environment:
     def out_of_bounds(self, pos) -> bool:
         '''Helper function that checks if given position is out of bounds'''
         return not(self.x_bounds[0] < pos[0] < self.x_bounds[1] and self.y_bounds[0] < pos[1] < self.y_bounds[1])
-
-    @staticmethod
-    def evaluate_agent(#grid_fp: Path,
-                       agent: BaseAgent,
-                       max_steps: int,
-                       agent_start_pos: tuple[int, int] = None,
-                       random_seed: int | float | str | bytes | bytearray = 0,
-                       show_images: bool = False):
-        """Evaluates a single trained agent's performance.
-
-        Currently all this does is run the agent, it does not save or visualize any output.
-        
-        OLD DESCRIPTION:
-        What this does is it creates a completely new environment from the
-        provided grid and does a number of steps _without_ processing rewards
-        for the agent. This means that the agent doesn't learn here and simply
-        provides actions for any provided observation.
-
-        For each evaluation run, this produces a statistics file in the out
-        directory which is a txt. This txt contains the values:
-        [ 'total_steps`, `total_failed_moves`]
-
-        Args:
-            grid_fp: Path to the grid file to use. <- UNUSED until obstacles are done
-            agent: Trained agent to evaluate.
-            max_steps: Max number of steps to take. 
-            sigma: same as abve. <- UNUSED
-            agent_start_pos: same as above.
-            random_seed: same as above.
-            show_images: Whether to show the images at the end of the
-                evaluation. If False, only saves the images. <- UNUSED until GUI is done
-        """
-
-        env = Cont_Environment(#grid_fp=grid_fp,
-                          no_gui=True,
-                          #sigma=sigma,
-                          agent_start_pos=agent_start_pos,
-                          #target_fps=-1,
-                          random_seed=random_seed)
-        
-        state = env.reset()
-        #initial_grid = np.copy(env.grid)
-
-        # Add initial agent position to the path
-        agent_path = [env.agent_pos]
-
-        for _ in trange(max_steps, desc="Evaluating agent"):
-            
-            action = agent.take_action(state)
-            state, _, terminated, _, _ = env.step(action)
-
-            agent_path.append(state)
-
-            if terminated:
-                break
-        
-        # Once evaluation is done (early‐stop or full run), save the path image:
-        visualize_path_cont_env(env, agent_path)
-        print(f"\n✅ Evaluation finished after {len(agent_path)-1} steps — trajectory saved in results/") 
-        #env.world_stats["targets_remaining"] = np.sum(env.grid == 3)
-
-        # TODO: Replace visualize_path function
-        #path_image = visualize_path(initial_grid, agent_path)
-        #file_name = datetime.now().strftime("%Y-%m-%d__%H-%M-%S")
-
-        #save_results(file_name, env.world_stats, path_image, show_images)

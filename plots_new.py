@@ -1,4 +1,4 @@
-# Script to plot the *average reward over last N episodes* for one experiment.
+# Script to plot the *average reward over last 50 episodes* for one experiment.
 # Produces one figure per experiment (i.e. parameter being varied) and per grid, with 6 lines;
 # 3 solid ones in different colors for DQN with different settings, and 3 dashed ones in those same colors for PPO with different settings.
 
@@ -12,13 +12,13 @@ LOG_DIR = 'results_common/logs'     # Folder where the metrics for the whole run
 OUTPUT_DIR = 'results_common/plots' # Folder to output plots to
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
-### VALUES TO PLOT ###
+### VALUES TO PLOT - MODIFY HERE ###
 # Note: plot only one environment at a time, since the optimal path is different between grids.
-ENV_TO_PLOT = 'table_easy'      # Which environment to make a plot for, 'Easy' or 'Hard'
-PARAM_TO_PLOT = 'Learning rate' # Which parameter to make a plot for, 'Episodes', 'Steps', 'Learning rate' or 'Target reward'
+ENV_TO_PLOT = 'table_easy'  # Which environment to make a plot for, 'table_easy' or 'table_hard'
+PARAM_TO_PLOT = 'Steps'     # Which parameter to make a plot for, 'Episodes', 'Steps', 'Learning rate' or 'Target reward'
 
-ROLLING_AVG = 50          # Make sure this is the same as the one the experiments were carried out with
-COLORS = ['r', 'g', 'b']
+ROLLING_AVG = 50            # Make sure this is the same as the one the experiments were carried out with
+COLORS = ['r', 'g', 'b']    # Colors for the lines
 AGENTS = ['dqn', 'ppo']
 
 # Experimental values; default value should always be the middle one
@@ -30,12 +30,10 @@ TARGET_REWARD_VALUES = [100, 300, 700]
 
 ### AUXILIARY FUNCTIONS ###
 def read_data_file(environment, agent, no_episodes, no_steps, lr, target_reward):
-    '''Reads in a data csv and returns the episodes and corresponding rolling average rewards to use as x and y for plotting.
-    Also returns the episode nr where the reward has converged.'''
+    '''Reads in a data csv and returns the episodes and corresponding rolling average rewards to use as x and y for plotting.'''
     param_string = f'env={environment}_agent={agent}_episodes={no_episodes}_steps={no_steps}_lr={lr}_targetreward={target_reward}.csv'
     full_data = pandas.read_csv(f'{DATA_DIR}/METRICS_{param_string}', header=0)
-    #log_data = pandas.read_json(f'{LOG_DIR}/LOG_{param_string}')
-    return full_data['episode'], full_data[f'avg_last_{ROLLING_AVG}']#, log_data['CONVERGENCE EPISODE']
+    return full_data['episode'], full_data[f'avg_last_{ROLLING_AVG}']
 
 def get_label(param_to_plot, agent, no_episodes, no_steps, lr, target_reward):
     '''Returns the correct label for a line depending on which parameter needs to be plotted'''
@@ -57,7 +55,6 @@ def get_label(param_to_plot, agent, no_episodes, no_steps, lr, target_reward):
 # Note: this is based on the parameters provided in the VALUES TO PLOT section above, make sure to set them correctly there!
 def make_plot(env_to_plot, param_to_plot):
     # Select only default values for all parameters except the one we want to plot.
-    # Also initialize plot title & such
     episodes = [EPISODES_VALUES[1]]
     steps = [STEPS_VALUES[1]]
     lrs = [LR_VALUES[1]]
@@ -73,7 +70,7 @@ def make_plot(env_to_plot, param_to_plot):
         case 'Target reward':
             target_rewards = TARGET_REWARD_VALUES
 
-    # Plot the 6 lines as mentioned at the top
+    # Plot the 6 lines as mentioned at the top of this file
     for agent in AGENTS:
         color_id = 0
         linestyle = '--' if agent == 'ppo' else '-'
@@ -82,7 +79,6 @@ def make_plot(env_to_plot, param_to_plot):
             x, y = read_data_file(env_to_plot, agent, no_episodes, no_steps, lr, target_reward)
             label = get_label(param_to_plot, agent, no_episodes, no_steps, lr, target_reward)
             plt.plot(x, y, color=COLORS[color_id], linestyle=linestyle, label=label)
-            #plt.plot(convergence_episode, 0, color=COLORS[color_id], marker='o') # Plot a point on the x-axis where the convergence episode is reached
             color_id += 1
 
     plt.xlabel('Episode')

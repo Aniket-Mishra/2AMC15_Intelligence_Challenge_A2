@@ -67,14 +67,14 @@ class PPOAgent(BaseAgent):
     PPO alternates between running the current policy for T steps and updating for K epochs.'''
     def __init__(
         self,
-        state_dim,
-        action_dim,
-        gamma=0.99,
-        lr=3e-4,
-        clip_epsilon=0.2,
-        update_epochs=15, 
-        batch_size=64,     
-        gae_lambda=0.95
+        state_dim=3,      # Dimension of a state; currently states are described as (x, y, phi), so state_dim = 3
+        action_dim=3,     # Dimension of the action space; currently the robot can take 3 different actions, so action_dim = 3.
+        gamma=0.99,       # Discount factor for the return.
+        lr=3e-4,          # Optimizer learning rate.
+        clip_epsilon=0.2, # The policy probability ratio is clipped to be within 1 +- this number.
+        update_epochs=15, # Number of training epochs to perform after gathering epxerience.
+        batch_size=64,    # Training batch size.
+        gae_lambda=0.95   # Decay factor in calculating the generalized advantage.
     ):
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.actor = Actor(state_dim, action_dim).to(self.device)
