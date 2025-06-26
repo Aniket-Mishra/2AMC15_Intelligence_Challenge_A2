@@ -22,7 +22,7 @@ PPO improves classic policy gradients by constraining the policy update with a c
 
 `../world` - contains all files related to the environment. `cont_environment.py` contains logic for step taking of agents, collision detection, and GUI updates. `table_grid_easy.py`, `table_grid_hard.py` and `wall_grid.py` contain configurations for the respective obstacle layouts and can be modified/mimicked to create your own environments.
 
-`../results`, `../results_common` - stores the results including graphs as found in the report.
+`../results`, `../results_common` - stores the results including graphs. The experimental results used in the report can be found in the separate folder `../report_results`.
 
 `train_common.py` - Script to train a single agent on a specified grid with provided arguments.
 
